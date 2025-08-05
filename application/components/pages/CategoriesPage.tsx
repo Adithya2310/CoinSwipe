@@ -42,7 +42,7 @@ const CategoriesPage: React.FC<CategoriesPageProps> = ({ onNavigate }) => {
         </h2>
         <p className="ready-description">
           Each category contains carefully curated tokens from the Internet Computer ecosystem. 
-          Swipe right to invest, left to pass, and build your perfect ICP portfolio.
+          Swipe right to invest, left to pass, and build your perfect CoinSwipe portfolio.
         </p>
         <button className="portfolio-btn" onClick={handlePortfolioClick}>
           View Your Portfolio

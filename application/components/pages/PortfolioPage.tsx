@@ -6,9 +6,10 @@ import { PortfolioItem } from '../data/mockData';
 interface PortfolioPageProps {
   portfolio: PortfolioItem[];
   totalValue: number;
+  onDepositClick: () => void;
 }
 
-const PortfolioPage: React.FC<PortfolioPageProps> = ({ portfolio, totalValue }) => {
+const PortfolioPage: React.FC<PortfolioPageProps> = ({ portfolio, totalValue, onDepositClick }) => {
   const formatPrice = (price: number) => {
     if (price < 0.000001) {
       return price.toExponential(2);

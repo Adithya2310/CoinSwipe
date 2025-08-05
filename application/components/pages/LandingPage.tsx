@@ -1,42 +1,43 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useWeb3AuthConnect } from "@web3auth/modal/react";
+import { useWeb3AuthConnect, useWeb3AuthUser } from "@web3auth/modal/react";
 import { defaultBuyAmount } from '../data/mockData';
 
 interface LandingPageProps {
   onNavigate: (page: string) => void;
+  userBalance: number;
+  onUpdateDefaultAmount: (amount: number) => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
-  const { connect, loading: connectLoading, error: connectError } = useWeb3AuthConnect();
+const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUpdateDefaultAmount }) => {
+  const { connect, isConnected, loading: connectLoading, error: connectError } = useWeb3AuthConnect();
+  const { userInfo } = useWeb3AuthUser();
   const [buyAmount, setBuyAmount] = useState(defaultBuyAmount);
-  const [showAmountInput, setShowAmountInput] = useState(false);
 
   const handleLogin = () => {
     connect();
   };
 
   const handleSetAmount = () => {
-    // This would typically update user preferences
-    console.log('Setting default buy amount to:', buyAmount);
-    setShowAmountInput(false);
+    onUpdateDefaultAmount(buyAmount);
+    onNavigate('categories');
   };
 
   return (
     <div className="landing-page">
       {/* Hero Section */}
       <h1 className="hero-title">
-        Discover Crypto Like Never Before With Ic Swipe
+        Discover Crypto Like Never Before With Coin Swipe
       </h1>
       <p className="hero-subtitle">
         Swipe right to discover and invest in the next big cryptocurrency tokens on
         the Internet Computer. Your crypto journey is just a flick away.
       </p>
 
-      {/* Login Card */}
+      {/* Login/Settings Card */}
       <div className="login-card">
-        {!showAmountInput ? (
+        {!isConnected ? (
           <>
             <button
               className="login-btn"
@@ -46,7 +47,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               {connectLoading ? (
                 <>⏳ Connecting...</>
               ) : (
-                <>Login</>
+                <>🚪 Login with Internet Identity</>
               )}
             </button>
             {connectError && (
@@ -57,14 +58,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           <div className="amount-input-section">
             <div className="auth-status">🟢 Connected to Internet Computer</div>
             <label className="amount-label">
-              Default Buy Amount (in Dollars)
+              Default Buy Amount (In Dollars)
             </label>
             <input
               type="number"
               className="amount-input"
               value={buyAmount}
               onChange={(e) => setBuyAmount(parseFloat(e.target.value) || 0)}
-              placeholder="1"
+              placeholder="0.1"
               step="0.01"
               min="0.01"
             />
@@ -81,7 +82,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           <div className="feature-icon">→</div>
           <h3 className="feature-title">Swipe to Discover</h3>
           <p className="feature-description">
-            Find your next investment with our intuitive swipe interface built on ICP.
+            Find your next investment with our intuitive swipe interface built on Base.
           </p>
         </div>
 
@@ -97,7 +98,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           <div className="feature-icon">📊</div>
           <h3 className="feature-title">Portfolio Management</h3>
           <p className="feature-description">
-            Track and manage your ICP-based investments with real-time data.
+            Track and manage your investments with real-time data.
           </p>
         </div>
       </div>

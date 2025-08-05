@@ -4,13 +4,15 @@ import { useAccount } from "wagmi";
 
 // Import CoinSwipe components
 import Navigation from "./ui/Navigation";
+import AccountBalance from "./ui/AccountBalance";
+import DepositModal from "./ui/DepositModal";
 import LandingPage from "./pages/LandingPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import SwipePage from "./pages/SwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
 
 // Import data
-import { mockPortfolio, mockUserBalance, Token, PortfolioItem } from "./data/mockData";
+import { mockPortfolio, Token, PortfolioItem, defaultBuyAmount } from "./data/mockData";
 
 function App() {
   const { isConnected } = useWeb3AuthConnect();
@@ -20,7 +22,8 @@ function App() {
   const [currentPage, setCurrentPage] = useState('landing');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(mockPortfolio);
-  const [userBalance, setUserBalance] = useState(mockUserBalance);
+  const [buyAmount, setBuyAmount] = useState(defaultBuyAmount);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
   // Update current page based on connection status
   useEffect(() => {
@@ -73,18 +76,35 @@ function App() {
       setPortfolio([...portfolio, newItem]);
     }
     
-    // Update user balance
-    setUserBalance(prev => prev - amount);
+    // User balance is now handled by the wallet
   };
 
   const getTotalPortfolioValue = () => {
     return portfolio.reduce((total, item) => total + item.value, 0);
   };
 
+  const handleUpdateDefaultAmount = (amount: number) => {
+    setBuyAmount(amount);
+  };
+
+  const handleDepositClick = () => {
+    setIsDepositModalOpen(true);
+  };
+
+  const handleDepositModalClose = () => {
+    setIsDepositModalOpen(false);
+  };
+
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'landing':
-        return <LandingPage onNavigate={handleNavigation} />;
+        return (
+          <LandingPage 
+            onNavigate={handleNavigation}
+            userBalance={0} // This will be replaced by actual wallet balance
+            onUpdateDefaultAmount={handleUpdateDefaultAmount}
+          />
+        );
       
       case 'categories':
         return <CategoriesPage onNavigate={handleNavigation} />;
@@ -103,11 +123,18 @@ function App() {
           <PortfolioPage 
             portfolio={portfolio}
             totalValue={getTotalPortfolioValue()}
+            onDepositClick={handleDepositClick}
           />
         );
       
       default:
-        return <LandingPage onNavigate={handleNavigation} />;
+        return (
+          <LandingPage 
+            onNavigate={handleNavigation}
+            userBalance={0}
+            onUpdateDefaultAmount={handleUpdateDefaultAmount}
+          />
+        );
     }
   };
 
@@ -119,9 +146,20 @@ function App() {
         isConnected={isConnected}
       />
       
+      {/* Account Balance - Show when connected and not on landing page */}
+      {isConnected && currentPage !== 'landing' && (
+        <AccountBalance onDepositClick={handleDepositClick} />
+      )}
+      
       <main className="main-content">
         {renderCurrentPage()}
       </main>
+
+      {/* Deposit Modal */}
+      <DepositModal 
+        isOpen={isDepositModalOpen}
+        onClose={handleDepositModalClose}
+      />
     </div>
   );
 }
