@@ -1,96 +1,127 @@
-import { useWeb3AuthConnect, useWeb3AuthDisconnect, useWeb3AuthUser } from "@web3auth/modal/react";
-// IMP START - Blockchain Calls  
+import React, { useState, useEffect } from 'react';
+import { useWeb3AuthConnect } from "@web3auth/modal/react";
 import { useAccount } from "wagmi";
-import { SendTransaction } from "./wagmi/sendTransaction";
-import { Balance } from "./wagmi/getBalance";
-import { SwitchChain } from "./wagmi/switchNetwork";
-// IMP END - Blockchain Calls
+
+// Import CoinSwipe components
+import Navigation from "./ui/Navigation";
+import LandingPage from "./pages/LandingPage";
+import CategoriesPage from "./pages/CategoriesPage";
+import SwipePage from "./pages/SwipePage";
+import PortfolioPage from "./pages/PortfolioPage";
+
+// Import data
+import { mockPortfolio, mockUserBalance, Token, PortfolioItem } from "./data/mockData";
 
 function App() {
-  // IMP START - Login
-  const { connect, isConnected, loading: connectLoading, error: connectError } = useWeb3AuthConnect();
-  // IMP END - Login
-  // IMP START - Logout
-  const { disconnect, loading: disconnectLoading, error: disconnectError } = useWeb3AuthDisconnect();
-  // IMP END - Logout
-  const { userInfo } = useWeb3AuthUser();
-  // IMP START - Blockchain Calls
-  const { address, connector } = useAccount();
-  // IMP END - Blockchain Calls
+  const { isConnected } = useWeb3AuthConnect();
+  const { address } = useAccount();
+  
+  // App state
+  const [currentPage, setCurrentPage] = useState('landing');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>(mockPortfolio);
+  const [userBalance, setUserBalance] = useState(mockUserBalance);
 
-  function uiConsole(...args: any[]): void {
-    const el = document.querySelector("#console>p");
-    if (el) {
-      el.innerHTML = JSON.stringify(args || {}, null, 2);
-      console.log(...args);
+  // Update current page based on connection status
+  useEffect(() => {
+    if (isConnected && currentPage === 'landing') {
+      setCurrentPage('categories');
+    } else if (!isConnected && currentPage !== 'landing') {
+      setCurrentPage('landing');
     }
-  }
+  }, [isConnected, currentPage]);
 
-  const loggedInView = (
-    <div className="grid">
-      <h2>Connected to {connector?.name}</h2>
-      {/* IMP START - Blockchain Calls */}
-      <div>{address}</div>
-      {/* IMP END - Blockchain Calls */}
-      <div className="flex-container">
-        <div>
-          <button onClick={() => uiConsole(userInfo)} className="card">
-            Get User Info
-          </button>
-        </div>
-        {/* IMP START - Logout */}
-        <div>
-          <button onClick={() => disconnect()} className="card">
-            Log Out
-          </button>
-          {disconnectLoading && <div className="loading">Disconnecting...</div>}
-          {disconnectError && <div className="error">{disconnectError.message}</div>}
-        </div>
-        {/* IMP END - Logout */}
-      </div>
-      {/* IMP START - Blockchain Calls */}
-      <SendTransaction />
-      <Balance />
-      <SwitchChain />
-      {/* IMP END - Blockchain Calls */}
-    </div>
-  );
+  const handleNavigation = (page: string, categoryId?: string) => {
+    setCurrentPage(page);
+    if (categoryId) {
+      setSelectedCategory(categoryId);
+    }
+  };
 
-  const unloggedInView = (
-    // IMP START - Login
-    <div className="grid">
-      <button onClick={() => connect()} className="card">
-        Login
-      </button>
-      {connectLoading && <div className="loading">Connecting...</div>}
-      {connectError && <div className="error">{connectError.message}</div>}
-    </div>
-    // IMP END - Login
-  );
+  const handleTokenPurchase = (token: Token, amount: number) => {
+    // Check if token already exists in portfolio
+    const existingItemIndex = portfolio.findIndex(item => item.tokenId === token.id);
+    
+    if (existingItemIndex >= 0) {
+      // Update existing portfolio item
+      const updatedPortfolio = [...portfolio];
+      const existingItem = updatedPortfolio[existingItemIndex];
+      const newAmount = existingItem.amount + (amount / token.price);
+      const newValue = existingItem.value + amount;
+      const avgPurchasePrice = (existingItem.purchasePrice * existingItem.value + amount * amount) / newValue;
+      
+      updatedPortfolio[existingItemIndex] = {
+        ...existingItem,
+        amount: newAmount,
+        value: newValue,
+        purchasePrice: avgPurchasePrice,
+        change: ((newValue - avgPurchasePrice) / avgPurchasePrice) * 100
+      };
+      
+      setPortfolio(updatedPortfolio);
+    } else {
+      // Add new portfolio item
+      const newItem: PortfolioItem = {
+        tokenId: token.id,
+        token: token,
+        amount: amount / token.price,
+        value: amount,
+        purchasePrice: amount,
+        change: 0
+      };
+      
+      setPortfolio([...portfolio, newItem]);
+    }
+    
+    // Update user balance
+    setUserBalance(prev => prev - amount);
+  };
+
+  const getTotalPortfolioValue = () => {
+    return portfolio.reduce((total, item) => total + item.value, 0);
+  };
+
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'landing':
+        return <LandingPage onNavigate={handleNavigation} />;
+      
+      case 'categories':
+        return <CategoriesPage onNavigate={handleNavigation} />;
+      
+      case 'swipe':
+        return (
+          <SwipePage 
+            categoryId={selectedCategory} 
+            onNavigate={handleNavigation}
+            onTokenPurchase={handleTokenPurchase}
+          />
+        );
+      
+      case 'portfolio':
+        return (
+          <PortfolioPage 
+            portfolio={portfolio}
+            totalValue={getTotalPortfolioValue()}
+          />
+        );
+      
+      default:
+        return <LandingPage onNavigate={handleNavigation} />;
+    }
+  };
 
   return (
-    <div className="container">
-      <h1 className="title">
-        <a target="_blank" href="https://web3auth.io/docs/sdk/pnp/web/modal" rel="noreferrer">
-          Web3Auth{" "}
-        </a>
-        & Next.js Modal Quick Start
-      </h1>
-
-      {isConnected ? loggedInView : unloggedInView}
-      <div id="console" style={{ whiteSpace: "pre-line" }}>
-        <p style={{ whiteSpace: "pre-line" }}></p>
-      </div>
-
-      <footer className="footer">
-        <a
-          href="https://github.com/Web3Auth/web3auth-examples/tree/main/quick-starts/nextjs-quick-start"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Source code
-        </a>
-      </footer>
+    <div className="app-container">
+      <Navigation 
+        currentPage={currentPage}
+        onNavigate={handleNavigation}
+        isConnected={isConnected}
+      />
+      
+      <main className="main-content">
+        {renderCurrentPage()}
+      </main>
     </div>
   );
 }
