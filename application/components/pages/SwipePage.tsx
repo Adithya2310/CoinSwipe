@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { categories, mockUserBalance, defaultBuyAmount, Token } from '../data/mockData';
 
 interface SwipePageProps {
@@ -15,6 +15,13 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
   const [buyAmount, setBuyAmount] = useState(defaultBuyAmount);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  
+  // Touch/Swipe state
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [currentX, setCurrentX] = useState(0);
+  const [cardOffset, setCardOffset] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const category = categories.find(c => c.id === categoryId);
   const tokens = category?.tokens || [];
@@ -66,6 +73,111 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
     onNavigate('categories');
   };
 
+  // Touch/Swipe handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true);
+    setStartX(e.touches[0].clientX);
+    setCurrentX(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    
+    const clientX = e.touches[0].clientX;
+    setCurrentX(clientX);
+    const offset = clientX - startX;
+    setCardOffset(offset);
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+    
+    const offset = currentX - startX;
+    const threshold = 100; // Minimum swipe distance
+    
+    if (Math.abs(offset) > threshold) {
+      if (offset > 0) {
+        // Swipe right - buy
+        handleSwipeRight();
+      } else {
+        // Swipe left - skip
+        handleSwipeLeft();
+      }
+    }
+    
+    // Reset swipe state
+    setIsDragging(false);
+    setCardOffset(0);
+    setStartX(0);
+    setCurrentX(0);
+  };
+
+  // Mouse handlers for desktop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setCurrentX(e.clientX);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    setCurrentX(e.clientX);
+    const offset = e.clientX - startX;
+    setCardOffset(offset);
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+    
+    const offset = currentX - startX;
+    const threshold = 100;
+    
+    if (Math.abs(offset) > threshold) {
+      if (offset > 0) {
+        handleSwipeRight();
+      } else {
+        handleSwipeLeft();
+      }
+    }
+    
+    setIsDragging(false);
+    setCardOffset(0);
+    setStartX(0);
+    setCurrentX(0);
+  };
+
+  const getCardStyle = () => {
+    const rotation = cardOffset * 0.1; // Subtle rotation
+    const opacity = Math.max(0.7, 1 - Math.abs(cardOffset) * 0.002);
+    
+    return {
+      transform: `translateX(${cardOffset}px) rotate(${rotation}deg)`,
+      opacity: opacity,
+      transition: isDragging ? 'none' : 'all 0.3s ease',
+    };
+  };
+
+  const getSwipeIndicator = () => {
+    if (Math.abs(cardOffset) < 50) return null;
+    
+    if (cardOffset > 50) {
+      return (
+        <div className="swipe-indicator buy">
+          <span>👍 BUY</span>
+        </div>
+      );
+    } else if (cardOffset < -50) {
+      return (
+        <div className="swipe-indicator skip">
+          <span>👎 SKIP</span>
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
   const formatPrice = (price: number) => {
     if (price < 0.000001) {
       return price.toExponential(2);
@@ -88,7 +200,7 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
       <div className="swipe-page">
         <div className="swipe-header">
           <button className="back-btn" onClick={handleBackToCategories}>
-            ← Back to Categories
+            ←
           </button>
         </div>
         <div className="swipe-container">
@@ -107,7 +219,7 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
           </button>
         </div>
         <div className="swipe-container">
-          <p>You've seen all tokens in this category!</p>
+          <p>You&apos;ve seen all tokens in this category!</p>
           <button className="portfolio-btn" onClick={() => onNavigate('categories')}>
             Explore More Categories
           </button>
@@ -137,7 +249,7 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
       {/* Header */}
       <div className="swipe-header">
         <button className="back-btn" onClick={handleBackToCategories}>
-          ← Back to Categories
+          ← 
         </button>
         <h1 className="swipe-title">{category.name}</h1>
         <div className="swipe-stats">
@@ -154,10 +266,23 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
         </div>
 
         {/* Token Card */}
-        <div className="swipe-card">
-          <div className="token-icon" style={{ backgroundColor: currentToken.color }}>
-            {currentToken.icon}
-          </div>
+        <div className="swipe-card-container">
+          {getSwipeIndicator()}
+          <div 
+            ref={cardRef}
+            className="swipe-card"
+            style={getCardStyle()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp} // Handle mouse leaving the card area
+          >
+            <div className="token-icon" style={{ backgroundColor: currentToken.color }}>
+              {currentToken.icon}
+            </div>
           
           <h2 className="token-name">{currentToken.name}</h2>
           <p className="token-symbol">{currentToken.symbol}</p>
@@ -184,24 +309,11 @@ const SwipePage: React.FC<SwipePageProps> = ({ categoryId, onNavigate, onTokenPu
             </div>
           </div>
           
-          <div className="fdv-stat">
-            <div className="stat-label">FDV</div>
-            <div className="stat-value">{formatLargeNumber(currentToken.fdv)}</div>
+            <div className="fdv-stat">
+              <div className="stat-label">FDV</div>
+              <div className="stat-value">{formatLargeNumber(currentToken.fdv)}</div>
+            </div>
           </div>
-        </div>
-
-        {/* Swipe Actions */}
-        <div className="swipe-actions">
-          <button className="swipe-btn skip" onClick={handleSwipeLeft}>
-            👎
-          </button>
-          <button 
-            className="swipe-btn buy" 
-            onClick={handleSwipeRight}
-            disabled={balance < buyAmount}
-          >
-            👍
-          </button>
         </div>
       </div>
     </div>
