@@ -1,0 +1,14 @@
+# Ignore build and dependency folders
+application/node_modules/
+application/.next/
+application/dist/
+application/build/
+
+# Ignore docs output if any
+docs/
+
+# Ignore editor & env files
+.vscode/
+.env
+.env.local
+*.lock

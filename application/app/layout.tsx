@@ -14,8 +14,8 @@ import { headers } from "next/headers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Web3Auth NextJS Quick Start",
-  description: "Web3Auth NextJS Quick Start",
+  title: "CoinSwipe - Discover Crypto Like Never Before",
+  description: "Swipe right to discover and invest in the next big cryptocurrency tokens on the Base Network. Your crypto journey is just a flick away.",
 };
 
 // eslint-disable-next-line no-undef

@@ -1,0 +1,16 @@
+name: Semgrep CE scan
+on:
+  push:            # runs on every push (all branches)
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  semgrep:
+    name: semgrep-oss/scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest   # official Docker image with Semgrep preinstalled
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep (auto rules)
+        run: semgrep scan --config auto .
