@@ -15,7 +15,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "CoinSwipe - Discover Crypto Like Never Before",
-  description: "Swipe right to discover and invest in the next big cryptocurrency tokens on the Internet Computer. Your crypto journey is just a flick away.",
+  description: "Swipe right to discover and invest in the next big cryptocurrency tokens on the Base Network. Your crypto journey is just a flick away.",
 };
 
 // eslint-disable-next-line no-undef

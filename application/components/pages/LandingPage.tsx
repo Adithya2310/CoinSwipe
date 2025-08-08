@@ -32,7 +32,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUp
       </h1>
       <p className="hero-subtitle">
         Swipe right to discover and invest in the next big cryptocurrency tokens on
-        the Internet Computer. Your crypto journey is just a flick away.
+        the Base Network. Your crypto journey is just a flick away.
       </p>
 
       {/* Login/Settings Card */}
@@ -47,7 +47,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUp
               {connectLoading ? (
                 <>⏳ Connecting...</>
               ) : (
-                <>🚪 Login with Internet Identity</>
+                <>🚪 Login</>
               )}
             </button>
             {connectError && (
@@ -56,7 +56,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUp
           </>
         ) : (
           <div className="amount-input-section">
-            <div className="auth-status">🟢 Connected to Internet Computer</div>
+            <div className="auth-status">🟢 Connected to Base Network</div>
             <label className="amount-label">
               Default Buy Amount (In Dollars)
             </label>
@@ -90,7 +90,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUp
           <div className="feature-icon">🚪</div>
           <h3 className="feature-title">Decentralized Trading</h3>
           <p className="feature-description">
-            Trade tokens directly on-chain with the security of the Internet Computer.
+            Trade tokens directly on-chain with the security of the Base Network.
           </p>
         </div>
 

@@ -291,7 +291,7 @@ export const categories: Category[] = [
   {
     id: "new",
     name: "Newly Launched",
-    description: "Recently launched tokens on Internet Computer",
+    description: "Recently launched tokens on Base Network",
     icon: "🚀",
     iconClass: "new",
     tokens: mockTokens.filter(t => t.category === "new")

@@ -44,7 +44,7 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ portfolio, totalValue, on
                 Your portfolio is empty
               </h3>
               <p style={{ color: 'var(--text-gray)', marginBottom: '24px' }}>
-                Start swiping to discover and invest in amazing tokens on the Internet Computer!
+                Start swiping to discover and invest in amazing tokens on the Base Network!
               </p>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
             </div>
