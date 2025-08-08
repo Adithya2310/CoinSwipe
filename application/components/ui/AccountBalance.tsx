@@ -60,7 +60,7 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({ onDepositClick }) => {
       
       <div className="balance-content">
         <div className="balance-item">
-          <div className="balance-label">Eth Balance</div>
+          <div className="balance-label">USDC Balance</div>
           <div className="balance-value primary">{getUSDBalance()}</div>
         </div>
         
