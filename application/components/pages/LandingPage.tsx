@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useWeb3AuthConnect, useWeb3AuthUser } from "@web3auth/modal/react";
-import { defaultBuyAmount } from '../data/mockData';
+import { defaultBuyAmount } from '../data/liveData';
 
 interface LandingPageProps {
   onNavigate: (page: string) => void;

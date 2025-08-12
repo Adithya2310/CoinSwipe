@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { PortfolioItem } from '../data/mockData';
+import { PortfolioItem } from '../data/liveData';
 
 interface PortfolioPageProps {
   portfolio: PortfolioItem[];

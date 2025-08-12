@@ -1,13 +1,31 @@
 "use client";
 
-import React from 'react';
-import { categories, mockUserBalance } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { liveDataService, Category } from '../data/liveData';
 
 interface CategoriesPageProps {
   onNavigate: (page: string, categoryId?: string) => void;
 }
 
 const CategoriesPage: React.FC<CategoriesPageProps> = ({ onNavigate }) => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const cats = await liveDataService.getCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
   const handleCategoryClick = (categoryId: string) => {
     onNavigate('swipe', categoryId);
   };
@@ -15,6 +33,17 @@ const CategoriesPage: React.FC<CategoriesPageProps> = ({ onNavigate }) => {
   const handlePortfolioClick = () => {
     onNavigate('portfolio');
   };
+
+  if (loading) {
+    return (
+      <div className="categories-page">
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+          <p>Loading live categories from Base network...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="categories-page">
@@ -31,6 +60,9 @@ const CategoriesPage: React.FC<CategoriesPageProps> = ({ onNavigate }) => {
             </div>
             <h3 className="category-title">{category.name}</h3>
             <p className="category-description">{category.description}</p>
+            <div className="token-count">
+              {category.tokens.length} tokens available
+            </div>
           </div>
         ))}
       </div>

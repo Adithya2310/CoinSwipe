@@ -12,7 +12,7 @@ import SwipePage from "./pages/SwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
 
 // Import data
-import { mockPortfolio, Token, PortfolioItem, defaultBuyAmount } from "./data/mockData";
+import { mockPortfolio, Token, PortfolioItem, defaultBuyAmount } from "./data/liveData";
 
 function App() {
   const { isConnected } = useWeb3AuthConnect();
@@ -146,8 +146,8 @@ function App() {
         isConnected={isConnected}
       />
       
-      {/* Account Balance - Show when connected and not on landing page */}
-      {isConnected && currentPage !== 'landing' && (
+      {/* Account Balance - Show only on portfolio page */}
+      {isConnected && currentPage === 'portfolio' && (
         <AccountBalance onDepositClick={handleDepositClick} />
       )}
       
