@@ -44,10 +44,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
             🏠 Home
           </button>
           <button
-            className={`nav-item ${currentPage === 'categories' ? 'active' : ''}`}
-            onClick={() => handleNavigate('categories')}
+            className={`nav-item ${currentPage === 'trending' ? 'active' : ''}`}
+            onClick={() => handleNavigate('trending')}
           >
-            📱 Categories
+            🔥 Trending
           </button>
           <button
             className={`nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}
@@ -101,10 +101,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
                 🏠 Home
               </button>
               <button
-                className={`mobile-nav-item ${currentPage === 'categories' ? 'active' : ''}`}
-                onClick={() => handleNavigate('categories')}
+                className={`mobile-nav-item ${currentPage === 'trending' ? 'active' : ''}`}
+                onClick={() => handleNavigate('trending')}
               >
-                📱 Categories
+                🔥 Trending
               </button>
               <button
                 className={`mobile-nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}

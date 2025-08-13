@@ -7,12 +7,28 @@ import Navigation from "./ui/Navigation";
 import AccountBalance from "./ui/AccountBalance";
 import DepositModal from "./ui/DepositModal";
 import LandingPage from "./pages/LandingPage";
-import CategoriesPage from "./pages/CategoriesPage";
-import SwipePage from "./pages/SwipePage";
+import TrendingSwipePage from "./pages/TrendingSwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
 
-// Import data
-import { mockPortfolio, Token, PortfolioItem, defaultBuyAmount } from "./data/liveData";
+// Simplified data types
+interface Token {
+  id: string;
+  name: string;
+  symbol: string;
+  price: number;
+  pairAddress?: string;
+}
+
+interface PortfolioItem {
+  tokenId: string;
+  token: Token;
+  amount: number;
+  value: number;
+  purchasePrice: number;
+  change: number;
+}
+
+const defaultBuyAmount = 1.00;
 
 function App() {
   const { isConnected } = useWeb3AuthConnect();
@@ -20,25 +36,21 @@ function App() {
   
   // App state
   const [currentPage, setCurrentPage] = useState('landing');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>(mockPortfolio);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [buyAmount, setBuyAmount] = useState(defaultBuyAmount);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
   // Update current page based on connection status
   useEffect(() => {
     if (isConnected && currentPage === 'landing') {
-      setCurrentPage('categories');
+      setCurrentPage('trending'); // Go directly to trending swipe
     } else if (!isConnected && currentPage !== 'landing') {
       setCurrentPage('landing');
     }
   }, [isConnected, currentPage]);
 
-  const handleNavigation = (page: string, categoryId?: string) => {
+  const handleNavigation = (page: string) => {
     setCurrentPage(page);
-    if (categoryId) {
-      setSelectedCategory(categoryId);
-    }
   };
 
   const handleTokenPurchase = (token: Token, amount: number) => {
@@ -106,13 +118,9 @@ function App() {
           />
         );
       
-      case 'categories':
-        return <CategoriesPage onNavigate={handleNavigation} />;
-      
-      case 'swipe':
+      case 'trending':
         return (
-          <SwipePage 
-            categoryId={selectedCategory} 
+          <TrendingSwipePage 
             onNavigate={handleNavigation}
             onTokenPurchase={handleTokenPurchase}
           />

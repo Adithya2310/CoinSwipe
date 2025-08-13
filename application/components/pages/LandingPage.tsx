@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useWeb3AuthConnect, useWeb3AuthUser } from "@web3auth/modal/react";
-import { defaultBuyAmount } from '../data/liveData';
 
 interface LandingPageProps {
   onNavigate: (page: string) => void;
@@ -13,7 +12,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUpdateDefaultAmount }) => {
   const { connect, isConnected, loading: connectLoading, error: connectError } = useWeb3AuthConnect();
   const { userInfo } = useWeb3AuthUser();
-  const [buyAmount, setBuyAmount] = useState(defaultBuyAmount);
+  const [buyAmount, setBuyAmount] = useState(1.0);
 
   const handleLogin = () => {
     connect();
@@ -21,7 +20,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUp
 
   const handleSetAmount = () => {
     onUpdateDefaultAmount(buyAmount);
-    onNavigate('categories');
+    onNavigate('trending');
   };
 
   return (
