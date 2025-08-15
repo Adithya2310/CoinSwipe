@@ -71,6 +71,8 @@ export function sanitizeString(input: string, maxLength: number = 100): string {
  * @returns boolean - true if response is valid
  */
 export function validateApiResponse(response: any, requiredFields: string[]): boolean {
+  const dangerousKeys = ["__proto__", "constructor", "prototype"];
+
   if (!response || typeof response !== 'object') {
     return false;
   }
@@ -78,14 +80,19 @@ export function validateApiResponse(response: any, requiredFields: string[]): bo
   return requiredFields.every(field => {
     const keys = field.split('.');
     let current = response;
-    
+
     for (const key of keys) {
-      if (!current || typeof current !== 'object' || !(key in current)) {
+      if (
+        !current ||
+        typeof current !== 'object' ||
+        !(key in current) ||
+        dangerousKeys.includes(key)
+      ) {
         return false;
       }
       current = current[key];
     }
-    
     return true;
   });
 }
+
