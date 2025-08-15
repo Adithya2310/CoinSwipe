@@ -9,8 +9,13 @@ import DepositModal from "./ui/DepositModal";
 import LandingPage from "./pages/LandingPage";
 import TrendingSwipePage from "./pages/TrendingSwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
+import ActivityPage from "./pages/ActivityPage";
 
-// Simplified data types
+// Import Supabase integration
+import { supabaseService } from "../lib/supabaseService";
+import { PortfolioItemUI } from "../lib/supabase";
+
+// Data types for backward compatibility
 interface Token {
   id: string;
   name: string;
@@ -19,14 +24,8 @@ interface Token {
   pairAddress?: string;
 }
 
-interface PortfolioItem {
-  tokenId: string;
-  token: Token;
-  amount: number;
-  value: number;
-  purchasePrice: number;
-  change: number;
-}
+// Use Supabase types for portfolio
+type PortfolioItem = PortfolioItemUI;
 
 const defaultBuyAmount = 1.00;
 
@@ -39,6 +38,8 @@ function App() {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [buyAmount, setBuyAmount] = useState(defaultBuyAmount);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [totalPortfolioValue, setTotalPortfolioValue] = useState(0);
+  const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
 
   // Update current page based on connection status
   useEffect(() => {
@@ -49,54 +50,120 @@ function App() {
     }
   }, [isConnected, currentPage]);
 
+  // Load portfolio data when user connects
+  useEffect(() => {
+    if (isConnected && address) {
+      loadUserPortfolio();
+      loadUserSettings();
+    } else {
+      // Reset portfolio when disconnected
+      setPortfolio([]);
+      setTotalPortfolioValue(0);
+      setBuyAmount(defaultBuyAmount);
+    }
+  }, [isConnected, address]);
+
+  // Load user portfolio from Supabase
+  const loadUserPortfolio = async () => {
+    if (!address) return;
+    
+    setIsLoadingPortfolio(true);
+    try {
+      const portfolioData = await supabaseService.getUserPortfolio(address);
+      setPortfolio(portfolioData);
+      
+      const totalValue = portfolioData.reduce((sum, item) => sum + item.value, 0);
+      setTotalPortfolioValue(totalValue);
+    } catch (error) {
+      console.error('Error loading portfolio:', error);
+    } finally {
+      setIsLoadingPortfolio(false);
+    }
+  };
+
+  // Load user settings (default amount)
+  const loadUserSettings = async () => {
+    if (!address) return;
+    
+    try {
+      const user = await supabaseService.createOrGetUser(address, defaultBuyAmount);
+      if (user) {
+        setBuyAmount(user.default_amount);
+      }
+    } catch (error) {
+      console.error('Error loading user settings:', error);
+    }
+  };
+
   const handleNavigation = (page: string) => {
     setCurrentPage(page);
   };
 
-  const handleTokenPurchase = (token: Token, amount: number) => {
-    // Check if token already exists in portfolio
-    const existingItemIndex = portfolio.findIndex(item => item.tokenId === token.id);
-    
-    if (existingItemIndex >= 0) {
-      // Update existing portfolio item
-      const updatedPortfolio = [...portfolio];
-      const existingItem = updatedPortfolio[existingItemIndex];
-      const newAmount = existingItem.amount + (amount / token.price);
-      const newValue = existingItem.value + amount;
-      const avgPurchasePrice = (existingItem.purchasePrice * existingItem.value + amount * amount) / newValue;
-      
-      updatedPortfolio[existingItemIndex] = {
-        ...existingItem,
-        amount: newAmount,
-        value: newValue,
-        purchasePrice: avgPurchasePrice,
-        change: ((newValue - avgPurchasePrice) / avgPurchasePrice) * 100
-      };
-      
-      setPortfolio(updatedPortfolio);
-    } else {
-      // Add new portfolio item
-      const newItem: PortfolioItem = {
-        tokenId: token.id,
-        token: token,
-        amount: amount / token.price,
-        value: amount,
-        purchasePrice: amount,
-        change: 0
-      };
-      
-      setPortfolio([...portfolio, newItem]);
+  const handleTokenPurchase = async (token: any, amount: number) => {
+    if (!address) {
+      console.error('No wallet address available');
+      return;
     }
-    
-    // User balance is now handled by the wallet
+
+    try {
+      // Extract token data for Supabase
+      const tokenData = {
+        contractAddress: token.baseToken?.address || token.contractAddress || token.id,
+        pairAddress: token.pairAddress,
+        name: token.baseToken?.name || token.name,
+        symbol: token.baseToken?.symbol || token.symbol,
+        iconUrl: token.baseToken?.info?.imageUrl || token.info?.imageUrl,
+        color: '#6366f1', // Default color
+        currentPrice: token.priceUsd ? parseFloat(token.priceUsd) : (token.price || 0),
+        priceChange24h: token.priceChange?.h24 || token.priceChange24h,
+        liquidityUsd: token.liquidity?.usd,
+        marketCap: token.marketCap,
+        fdv: token.fdv,
+        trustLevel: 'medium' as const
+      };
+
+      const pricePerToken = tokenData.currentPrice;
+      const tokenAmount = amount / pricePerToken;
+
+      // Add purchase to Supabase
+      const success = await supabaseService.addTokenPurchase(
+        address,
+        tokenData,
+        tokenAmount,
+        pricePerToken
+      );
+
+      if (success) {
+        // Reload portfolio to reflect the purchase
+        await loadUserPortfolio();
+        console.log('Token purchase recorded successfully');
+      } else {
+        console.error('Failed to record token purchase');
+        // Fallback to local state for now
+        console.log('Using fallback local state update');
+      }
+    } catch (error) {
+      console.error('Error handling token purchase:', error);
+      // Fallback to local state management
+      console.log('Using fallback local state update due to error');
+    }
   };
 
   const getTotalPortfolioValue = () => {
-    return portfolio.reduce((total, item) => total + item.value, 0);
+    return totalPortfolioValue;
   };
 
-  const handleUpdateDefaultAmount = (amount: number) => {
+  const handleUpdateDefaultAmount = async (amount: number) => {
     setBuyAmount(amount);
+    
+    // Update default amount in Supabase
+    if (address) {
+      try {
+        await supabaseService.updateUserDefaultAmount(address, amount);
+      } catch (error) {
+        console.error('Error updating default amount:', error);
+      }
+    }
   };
 
   const handleDepositClick = () => {
@@ -132,6 +199,13 @@ function App() {
             portfolio={portfolio}
             totalValue={getTotalPortfolioValue()}
             onDepositClick={handleDepositClick}
+          />
+        );
+      
+      case 'activity':
+        return (
+          <ActivityPage 
+            onNavigate={handleNavigation}
           />
         );
       

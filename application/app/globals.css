@@ -1773,3 +1773,140 @@ body {
     padding: 60px 20px;
   }
 }
+
+/* Activity Page Styles */
+.activity-page {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.activity-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.activity-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-white);
+  margin-bottom: 8px;
+}
+
+.activity-subtitle {
+  color: var(--text-gray);
+  font-size: 16px;
+}
+
+.activity-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-gray);
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.activity-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-purple);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+  border-color: var(--primary-purple);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+}
+
+.activity-icon {
+  flex-shrink: 0;
+}
+
+.activity-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-token {
+  margin-bottom: 8px;
+}
+
+.activity-token-name {
+  color: var(--text-white);
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.activity-token-symbol {
+  color: var(--text-gray);
+  font-size: 14px;
+}
+
+.activity-details {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.activity-amount {
+  color: var(--text-white);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.activity-price {
+  color: var(--text-gray);
+  font-size: 14px;
+}
+
+.activity-value {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.activity-total {
+  color: var(--text-white);
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.activity-date {
+  color: var(--text-gray);
+  font-size: 12px;
+}
+
+.activity-empty {
+  background: var(--bg-card);
+  border: 1px solid var(--border-purple);
+  border-radius: 16px;
+  margin-bottom: 30px;
+}
+
+.activity-summary {
+  background: var(--bg-card);
+  border: 1px solid var(--border-purple);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+@media (min-width: 768px) {
+  .activity-list {
+    gap: 20px;
+  }
+  
+  .activity-item {
+    padding: 24px;
+  }
+}

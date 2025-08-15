@@ -55,6 +55,12 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
           >
             📊 Portfolio
           </button>
+          <button
+            className={`nav-item ${currentPage === 'activity' ? 'active' : ''}`}
+            onClick={() => handleNavigate('activity')}
+          >
+            📈 Activity
+          </button>
         </div>
       )}
 
@@ -111,6 +117,12 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
                 onClick={() => handleNavigate('portfolio')}
               >
                 📊 Portfolio
+              </button>
+              <button
+                className={`mobile-nav-item ${currentPage === 'activity' ? 'active' : ''}`}
+                onClick={() => handleNavigate('activity')}
+              >
+                📈 Activity
               </button>
               <button
                 className="mobile-nav-item logout"

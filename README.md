@@ -54,16 +54,26 @@ chmod +x start-servers.sh
    cd CoinSwipe
    ```
 
-2. **Setup Backend Server**
+2. **Setup Database (Supabase)**
+   ```bash
+   # 1. Create a Supabase project at https://supabase.com
+   # 2. Apply the database migration from database/migrations/001_create_portfolio_schema.sql
+   # 3. Get your project URL and anon key from the Supabase dashboard
+   ```
+
+3. **Setup Backend Server**
    ```bash
    cd server
    npm install
    npm run dev  # Starts on port 3002
    ```
 
-3. **Setup Frontend (New Terminal)**
+4. **Setup Frontend (New Terminal)**
    ```bash
    cd application
+   # Copy environment template and add your Supabase credentials
+   cp env.example .env.local
+   # Edit .env.local with your Supabase URL and key
    npm install
    npm run dev  # Starts on port 3001
    ```
