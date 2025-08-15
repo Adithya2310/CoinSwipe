@@ -22,7 +22,7 @@ export const supabaseAdmin = supabaseServiceKey
 export interface User {
   id: string;
   wallet_address: string;
-  default_amount: number;
+  default_amount: number | null;
   created_at: string;
   updated_at: string;
 }

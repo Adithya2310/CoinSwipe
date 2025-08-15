@@ -24,7 +24,7 @@ export class SupabaseService {
    */
   
   // Create or get user by wallet address
-  async createOrGetUser(walletAddress: string, defaultAmount: number = 1.0): Promise<User | null> {
+  async createOrGetUser(walletAddress: string, defaultAmount: number | null = null): Promise<User | null> {
     try {
       this.setWalletAddress(walletAddress);
       
@@ -68,16 +68,53 @@ export class SupabaseService {
     }
   }
 
-  // Update user's default amount
+  // Check if user exists without creating
+  async getUserByWalletAddress(walletAddress: string): Promise<User | null> {
+    try {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('wallet_address', walletAddress)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching user:', error);
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      console.error('Error in getUserByWalletAddress:', error);
+      return null;
+    }
+  }
+
+  // Update user's default amount (creates user if doesn't exist)
   async updateUserDefaultAmount(walletAddress: string, defaultAmount: number): Promise<boolean> {
     try {
-      const { error } = await supabase
+      // First try to update existing user
+      const { error: updateError } = await supabase
         .from('users')
         .update({ default_amount: defaultAmount })
         .eq('wallet_address', walletAddress);
 
-      if (error) {
-        console.error('Error updating user default amount:', error);
+      if (updateError && updateError.code === 'PGRST116') {
+        // User doesn't exist, create new one
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([
+            {
+              wallet_address: walletAddress,
+              default_amount: defaultAmount
+            }
+          ]);
+
+        if (insertError) {
+          console.error('Error creating user:', insertError);
+          return false;
+        }
+      } else if (updateError) {
+        console.error('Error updating user default amount:', updateError);
         return false;
       }
 

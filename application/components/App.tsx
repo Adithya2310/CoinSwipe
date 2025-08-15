@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3AuthConnect } from "@web3auth/modal/react";
 import { useAccount } from "wagmi";
 
@@ -7,7 +7,6 @@ import Navigation from "./ui/Navigation";
 import AccountBalance from "./ui/AccountBalance";
 import DepositModal from "./ui/DepositModal";
 import LandingPage from "./pages/LandingPage";
-import DefaultAmountPage from "./pages/DefaultAmountPage";
 import TrendingSwipePage from "./pages/TrendingSwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
 import ActivityPage from "./pages/ActivityPage";
@@ -44,36 +43,8 @@ function App() {
   const [hasDefaultAmount, setHasDefaultAmount] = useState(false);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
-  // Update current page based on connection status and user data
-  useEffect(() => {
-    if (isConnected && currentPage === 'landing' && !isLoadingUserData) {
-      // If user has default amount set, go to trending; otherwise go to default amount setup
-      if (hasDefaultAmount) {
-        setCurrentPage('trending');
-      } else {
-        setCurrentPage('defaultAmount');
-      }
-    } else if (!isConnected && currentPage !== 'landing') {
-      setCurrentPage('landing');
-      setHasDefaultAmount(false);
-    }
-  }, [isConnected, currentPage, hasDefaultAmount, isLoadingUserData]);
-
-  // Load portfolio data when user connects
-  useEffect(() => {
-    if (isConnected && address) {
-      loadUserPortfolio();
-      loadUserSettings();
-    } else {
-      // Reset portfolio when disconnected
-      setPortfolio([]);
-      setTotalPortfolioValue(0);
-      setBuyAmount(defaultBuyAmount);
-    }
-  }, [isConnected, address]);
-
   // Load user portfolio from Supabase
-  const loadUserPortfolio = async () => {
+  const loadUserPortfolio = useCallback(async () => {
     if (!address) return;
     
     setIsLoadingPortfolio(true);
@@ -88,19 +59,24 @@ function App() {
     } finally {
       setIsLoadingPortfolio(false);
     }
-  };
+  }, [address]);
 
   // Load user settings (default amount)
-  const loadUserSettings = async () => {
+  const loadUserSettings = useCallback(async () => {
     if (!address) return;
     
     setIsLoadingUserData(true);
     try {
-      const user = await supabaseService.createOrGetUser(address, defaultBuyAmount);
-      if (user) {
-        setBuyAmount(user.default_amount);
-        // Check if user has set a custom default amount (not the default 1.0)
-        setHasDefaultAmount(user.default_amount !== defaultBuyAmount || user.default_amount > 0);
+      // Check if user exists without creating
+      const existingUser = await supabaseService.getUserByWalletAddress(address);
+      if (existingUser && existingUser.default_amount && existingUser.default_amount !== 0) {
+        // User exists and has explicitly set a default amount
+        setBuyAmount(existingUser.default_amount);
+        setHasDefaultAmount(true);
+      } else {
+        // User doesn't exist OR exists but hasn't set a default amount
+        setHasDefaultAmount(false);
+        setBuyAmount(defaultBuyAmount);
       }
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -108,7 +84,31 @@ function App() {
     } finally {
       setIsLoadingUserData(false);
     }
-  };
+  }, [address]);
+
+  // Update current page based on connection status
+  useEffect(() => {
+    if (isConnected && currentPage === 'landing') {
+      // Always go to trending when connected - modal will show if needed
+      setCurrentPage('trending');
+    } else if (!isConnected && currentPage !== 'landing') {
+      setCurrentPage('landing');
+      setHasDefaultAmount(false);
+    }
+  }, [isConnected, currentPage]);
+
+  // Load portfolio data when user connects
+  useEffect(() => {
+    if (isConnected && address) {
+      loadUserPortfolio();
+      loadUserSettings();
+    } else {
+      // Reset portfolio when disconnected
+      setPortfolio([]);
+      setTotalPortfolioValue(0);
+      setBuyAmount(defaultBuyAmount);
+    }
+  }, [isConnected, address, loadUserPortfolio, loadUserSettings]);
 
   const handleNavigation = (page: string) => {
     setCurrentPage(page);
@@ -176,8 +176,6 @@ function App() {
     if (address) {
       try {
         await supabaseService.updateUserDefaultAmount(address, amount);
-        // Navigate to trending after setting amount
-        setCurrentPage('trending');
       } catch (error) {
         console.error('Error updating default amount:', error);
       }
@@ -203,13 +201,7 @@ function App() {
           />
         );
       
-      case 'defaultAmount':
-        return (
-          <DefaultAmountPage 
-            onSetAmount={handleUpdateDefaultAmount}
-            defaultValue={buyAmount}
-          />
-        );
+
       
       case 'trending':
         return (
@@ -217,6 +209,8 @@ function App() {
             onNavigate={handleNavigation}
             onTokenPurchase={handleTokenPurchase}
             buyAmount={buyAmount}
+            onUpdateDefaultAmount={handleUpdateDefaultAmount}
+            hasDefaultAmount={hasDefaultAmount}
           />
         );
       
@@ -226,6 +220,8 @@ function App() {
             portfolio={portfolio}
             totalValue={getTotalPortfolioValue()}
             onDepositClick={handleDepositClick}
+            onUpdateDefaultAmount={handleUpdateDefaultAmount}
+            currentDefaultAmount={buyAmount}
           />
         );
       

@@ -54,6 +54,8 @@ class RealTimeService {
   private trendingTokens: TrendingToken[] = [];
   private currentTokenIndex = 0;
   private priceCallbacks = new Set<PriceUpdateCallback>();
+  private activeSubscriptions = new Set<string>(); // Track active subscriptions
+  private maxSubscriptions = 5; // Server limit
 
   /**
    * Initialize WebSocket Connection to Node.js Backend
@@ -189,8 +191,22 @@ class RealTimeService {
       return;
     }
 
+    // Check if already subscribed
+    if (this.activeSubscriptions.has(pairAddress)) {
+      console.log(`📊 Already subscribed to ${pairAddress}`);
+      return;
+    }
+
+    // Check subscription limit
+    if (this.activeSubscriptions.size >= this.maxSubscriptions) {
+      console.warn(`⚠️ Maximum subscriptions (${this.maxSubscriptions}) reached. Cleaning up oldest subscription.`);
+      const oldestSubscription = Array.from(this.activeSubscriptions)[0];
+      this.unsubscribeFromToken(oldestSubscription);
+    }
+
     console.log(`📊 Subscribing to price updates for ${pairAddress}`);
     this.socket.emit('subscribe', pairAddress);
+    this.activeSubscriptions.add(pairAddress);
   }
 
   // Unsubscribe from price updates
@@ -199,8 +215,12 @@ class RealTimeService {
       return;
     }
 
-    console.log(`📊 Unsubscribing from ${pairAddress}`);
-    this.socket.emit('unsubscribe', pairAddress);
+    // Only unsubscribe if actually subscribed
+    if (this.activeSubscriptions.has(pairAddress)) {
+      console.log(`📊 Unsubscribing from ${pairAddress}`);
+      this.socket.emit('unsubscribe', pairAddress);
+      this.activeSubscriptions.delete(pairAddress);
+    }
   }
 
   // Register callback for price updates
@@ -231,11 +251,32 @@ class RealTimeService {
   // Clean disconnect
   disconnect(): void {
     if (this.socket) {
+      // Unsubscribe from all active subscriptions
+      this.activeSubscriptions.forEach(pairAddress => {
+        this.socket?.emit('unsubscribe', pairAddress);
+      });
+      this.activeSubscriptions.clear();
+      
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
     }
     this.priceCallbacks.clear();
+  }
+
+  // Get current subscriptions (for debugging)
+  getActiveSubscriptions(): string[] {
+    return Array.from(this.activeSubscriptions);
+  }
+
+  // Clear all subscriptions (utility method)
+  clearAllSubscriptions(): void {
+    if (this.socket && this.isConnected) {
+      this.activeSubscriptions.forEach(pairAddress => {
+        this.socket?.emit('unsubscribe', pairAddress);
+      });
+      this.activeSubscriptions.clear();
+    }
   }
 
   // Transform token for UI compatibility

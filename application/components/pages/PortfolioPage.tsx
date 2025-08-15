@@ -1,15 +1,27 @@
 "use client";
 
-import React from 'react';
-import { PortfolioItem } from '../data/liveData';
+import React, { useState } from 'react';
+import { PortfolioItemUI } from '../../lib/supabase';
+import DefaultAmountModal from '../ui/DefaultAmountModal';
+
+type PortfolioItem = PortfolioItemUI;
 
 interface PortfolioPageProps {
   portfolio: PortfolioItem[];
   totalValue: number;
   onDepositClick: () => void;
+  onUpdateDefaultAmount?: (amount: number) => void;
+  currentDefaultAmount?: number;
 }
 
-const PortfolioPage: React.FC<PortfolioPageProps> = ({ portfolio, totalValue, onDepositClick }) => {
+const PortfolioPage: React.FC<PortfolioPageProps> = ({ 
+  portfolio, 
+  totalValue, 
+  onDepositClick, 
+  onUpdateDefaultAmount,
+  currentDefaultAmount = 1.0 
+}) => {
+  const [showAmountModal, setShowAmountModal] = useState(false);
   const formatPrice = (price: number) => {
     if (price < 0.000001) {
       return price.toExponential(2);
@@ -34,6 +46,24 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ portfolio, totalValue, on
         <h1 className="portfolio-title">Your Portfolio</h1>
         <div className="portfolio-value">${totalValue.toFixed(2)}</div>
       </div>
+
+      {/* Settings Section */}
+      {onUpdateDefaultAmount && (
+        <div className="portfolio-settings">
+          <div className="settings-item">
+            <div className="settings-info">
+              <span className="settings-label">Default Buy Amount</span>
+              <span className="settings-value">${currentDefaultAmount.toFixed(2)}</span>
+            </div>
+            <button 
+              className="settings-edit-btn"
+              onClick={() => setShowAmountModal(true)}
+            >
+              Edit
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Portfolio Items */}
       <div className="portfolio-grid">
@@ -157,6 +187,16 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ portfolio, totalValue, on
             </div>
           </div>
         </div>
+      )}
+
+      {/* Default Amount Modal */}
+      {onUpdateDefaultAmount && (
+        <DefaultAmountModal
+          isOpen={showAmountModal}
+          onClose={() => setShowAmountModal(false)}
+          onSetAmount={onUpdateDefaultAmount}
+          currentAmount={currentDefaultAmount}
+        />
       )}
     </div>
   );

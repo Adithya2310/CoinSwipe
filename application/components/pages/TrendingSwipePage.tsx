@@ -4,26 +4,39 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { formatUnits } from 'viem';
 import { realTimeService, TrendingToken, PriceUpdate } from '../services/realTimeService';
+import DefaultAmountModal from '../ui/DefaultAmountModal';
 
 interface TrendingSwipePageProps {
   onNavigate: (page: string) => void;
   onTokenPurchase: (token: any, amount: number) => void;
   buyAmount: number;
+  onUpdateDefaultAmount: (amount: number) => void;
+  hasDefaultAmount?: boolean;
 }
 
-const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTokenPurchase, buyAmount }) => {
+const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTokenPurchase, buyAmount, onUpdateDefaultAmount, hasDefaultAmount = true }) => {
   // Wallet integration
   const { address } = useAccount();
   const { data: balance, isLoading: balanceLoading } = useBalance({ address });
   
   // State management
   const [currentToken, setCurrentToken] = useState<any>(null);
+  const [nextToken, setNextToken] = useState<any>(null); // Preload next token
   const [loading, setLoading] = useState(true);
+  const [swipeLoading, setSwipeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showCopyToast, setShowCopyToast] = useState(false);
+  const [showAmountModal, setShowAmountModal] = useState(false);
+
+  // Auto-show modal if user doesn't have default amount set
+  useEffect(() => {
+    if (!hasDefaultAmount && !loading && connected) {
+      setShowAmountModal(true);
+    }
+  }, [hasDefaultAmount, loading, connected]);
   
   // Touch/Swipe state
   const [isDragging, setIsDragging] = useState(false);
@@ -59,6 +72,9 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
           
           // Subscribe to price updates
           subscribeToCurrentToken(firstToken.pairAddress);
+          
+          // Preload next token for smooth swipes
+          preloadNextToken();
         } else {
           setError('No trending tokens available');
         }
@@ -137,45 +153,81 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   };
 
   /**
+   * Preload Next Token
+   * 
+   * Preloads the next token for smooth transitions
+   */
+  const preloadNextToken = () => {
+    const nextTokenData = realTimeService.getNextToken();
+    if (nextTokenData) {
+      const uiToken = realTimeService.transformTokenForUI(nextTokenData);
+      setNextToken(uiToken);
+    } else {
+      // Refresh tokens if needed
+      realTimeService.refreshTokens().then(() => {
+        const refreshedToken = realTimeService.getNextToken();
+        if (refreshedToken) {
+          const uiToken = realTimeService.transformTokenForUI(refreshedToken);
+          setNextToken(uiToken);
+        }
+      });
+    }
+  };
+
+  /**
    * Load Next Token and Switch Subscription
    * 
    * When user swipes, this function:
-   * 1. Gets the next token from the trending list
-   * 2. Displays it immediately (no loading)
-   * 3. Switches WebSocket subscription (old closed, new opened)
-   * 4. Server starts sending price updates for new token only
+   * 1. Uses preloaded token for immediate display
+   * 2. Switches WebSocket subscription (old closed, new opened)
+   * 3. Preloads the next token for future swipes
    */
   const loadNextToken = () => {
     console.log('👆 User swiped - loading next token...');
     
+    if (swipeLoading) return; // Prevent multiple rapid swipes
+    
+    setSwipeLoading(true);
+    
     // Mark current subscription as inactive
     isSubscriptionActive.current = false;
     
-    const nextToken = realTimeService.getNextToken();
     if (nextToken) {
-      console.log(`🔄 Switching to token: ${nextToken.baseToken.symbol} (${nextToken.pairAddress})`);
+      console.log(`🔄 Switching to token: ${nextToken.symbol} (${nextToken.pairAddress})`);
       
-      // Display new token immediately (no loading screen)
-      const uiToken = realTimeService.transformTokenForUI(nextToken);
-      setCurrentToken(uiToken);
+      // Use preloaded token for immediate display
+      setCurrentToken(nextToken);
       
       // Switch WebSocket subscription (architecture requirement)
       subscribeToCurrentToken(nextToken.pairAddress);
-    } else {
-      console.log('📝 No more tokens, refreshing list...');
       
-      // If no more tokens, refresh the list and get first token
-      realTimeService.refreshTokens().then(() => {
-        const firstToken = realTimeService.getNextToken();
-        if (firstToken) {
-          console.log(`🔄 Refreshed - switching to: ${firstToken.baseToken.symbol}`);
-          
-          const uiToken = realTimeService.transformTokenForUI(firstToken);
-          setCurrentToken(uiToken);
-          subscribeToCurrentToken(firstToken.pairAddress);
-        }
-      });
+      // Preload next token for future swipes
+      preloadNextToken();
+    } else {
+      console.log('📝 No preloaded token, fetching new one...');
+      
+      const freshToken = realTimeService.getNextToken();
+      if (freshToken) {
+        const uiToken = realTimeService.transformTokenForUI(freshToken);
+        setCurrentToken(uiToken);
+        subscribeToCurrentToken(freshToken.pairAddress);
+        preloadNextToken();
+      } else {
+        // Refresh the entire list
+        realTimeService.refreshTokens().then(() => {
+          const firstToken = realTimeService.getNextToken();
+          if (firstToken) {
+            const uiToken = realTimeService.transformTokenForUI(firstToken);
+            setCurrentToken(uiToken);
+            subscribeToCurrentToken(firstToken.pairAddress);
+            preloadNextToken();
+          }
+        });
+      }
     }
+    
+    // Reset swipe loading after a short delay
+    setTimeout(() => setSwipeLoading(false), 300);
   };
 
   // Handle swipe actions
@@ -284,13 +336,13 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   };
 
   const getCardStyle = () => {
-    const rotation = cardOffset * 0.1;
-    const opacity = Math.max(0.7, 1 - Math.abs(cardOffset) * 0.002);
+    const rotation = cardOffset * 0.05; // Reduced rotation for more subtle effect
+    const scale = Math.max(0.95, 1 - Math.abs(cardOffset) * 0.0005); // Slight scale effect
     
     return {
-      transform: `translateX(${cardOffset}px) rotate(${rotation}deg)`,
-      opacity: opacity,
-      transition: isDragging ? 'none' : 'all 0.3s ease',
+      transform: `translateX(${cardOffset}px) rotate(${rotation}deg) scale(${scale})`,
+      transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+      zIndex: isDragging ? 10 : 1,
     };
   };
 
@@ -415,7 +467,13 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
       <div className="swipe-header">
         <h1 className="swipe-title">Trending on Base</h1>
         <div className="swipe-stats">
-          <div className="stat-item">Amount: ${buyAmount.toFixed(2)}</div>
+          <button 
+            className="stat-item clickable"
+            onClick={() => setShowAmountModal(true)}
+            title="Click to change default amount"
+          >
+            Amount: ${buyAmount.toFixed(2)} ✏️
+          </button>
           <div className="stat-item">Balance: {formatWalletBalance()}</div>
           <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
             {connected ? '🟢 LIVE' : '🔴 OFFLINE'}
@@ -456,8 +514,12 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
               </div>
               
               <div className="token-info-compact">
-                <h2 className="token-name-compact">{currentToken.name}</h2>
-                <p className="token-symbol-compact">{currentToken.symbol}</p>
+                <h2 className="token-name-compact" title={currentToken.name}>
+                  {currentToken.name}
+                </h2>
+                <p className="token-symbol-compact" title={currentToken.symbol}>
+                  {currentToken.symbol}
+                </p>
                 <div className={`trust-badge-compact ${currentToken.trustLevel}`}>
                   <span className="trust-icon">
                     {currentToken.trustLevel === 'high' && '🟢'}
@@ -544,9 +606,24 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
               <span className="live-dot-compact"></span>
               <span className="live-text-compact">REAL-TIME</span>
             </div>
+
+            {/* Loading Overlay for Swipes */}
+            {swipeLoading && (
+              <div className="swipe-loading-overlay">
+                <div className="swipe-loading-spinner"></div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Default Amount Modal */}
+      <DefaultAmountModal
+        isOpen={showAmountModal}
+        onClose={() => setShowAmountModal(false)}
+        onSetAmount={onUpdateDefaultAmount}
+        currentAmount={buyAmount}
+      />
     </div>
   );
 };
