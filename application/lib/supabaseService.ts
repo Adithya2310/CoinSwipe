@@ -77,7 +77,10 @@ export class SupabaseService {
         .eq('wallet_address', walletAddress)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error && error.code === 'PGRST123') {
+        console.error('Data integrity error: Multiple users found with wallet address:', walletAddress);
+        return null;
+      } else if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user:', error);
         return null;
       }
