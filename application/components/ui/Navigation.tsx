@@ -38,12 +38,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
       {isConnected && (
         <div className="nav-menu desktop-menu">
           <button
-            className={`nav-item ${currentPage === 'landing' ? 'active' : ''}`}
-            onClick={() => handleNavigate('landing')}
-          >
-            🏠 Home
-          </button>
-          <button
             className={`nav-item ${currentPage === 'trending' ? 'active' : ''}`}
             onClick={() => handleNavigate('trending')}
           >
@@ -100,12 +94,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
               </button>
             </div>
             <div className="mobile-menu-items">
-              <button
-                className={`mobile-nav-item ${currentPage === 'landing' ? 'active' : ''}`}
-                onClick={() => handleNavigate('landing')}
-              >
-                🏠 Home
-              </button>
               <button
                 className={`mobile-nav-item ${currentPage === 'trending' ? 'active' : ''}`}
                 onClick={() => handleNavigate('trending')}

@@ -7,6 +7,7 @@ import Navigation from "./ui/Navigation";
 import AccountBalance from "./ui/AccountBalance";
 import DepositModal from "./ui/DepositModal";
 import LandingPage from "./pages/LandingPage";
+import DefaultAmountPage from "./pages/DefaultAmountPage";
 import TrendingSwipePage from "./pages/TrendingSwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
 import ActivityPage from "./pages/ActivityPage";
@@ -40,15 +41,23 @@ function App() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [totalPortfolioValue, setTotalPortfolioValue] = useState(0);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
+  const [hasDefaultAmount, setHasDefaultAmount] = useState(false);
+  const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
-  // Update current page based on connection status
+  // Update current page based on connection status and user data
   useEffect(() => {
-    if (isConnected && currentPage === 'landing') {
-      setCurrentPage('trending'); // Go directly to trending swipe
+    if (isConnected && currentPage === 'landing' && !isLoadingUserData) {
+      // If user has default amount set, go to trending; otherwise go to default amount setup
+      if (hasDefaultAmount) {
+        setCurrentPage('trending');
+      } else {
+        setCurrentPage('defaultAmount');
+      }
     } else if (!isConnected && currentPage !== 'landing') {
       setCurrentPage('landing');
+      setHasDefaultAmount(false);
     }
-  }, [isConnected, currentPage]);
+  }, [isConnected, currentPage, hasDefaultAmount, isLoadingUserData]);
 
   // Load portfolio data when user connects
   useEffect(() => {
@@ -85,13 +94,19 @@ function App() {
   const loadUserSettings = async () => {
     if (!address) return;
     
+    setIsLoadingUserData(true);
     try {
       const user = await supabaseService.createOrGetUser(address, defaultBuyAmount);
       if (user) {
         setBuyAmount(user.default_amount);
+        // Check if user has set a custom default amount (not the default 1.0)
+        setHasDefaultAmount(user.default_amount !== defaultBuyAmount || user.default_amount > 0);
       }
     } catch (error) {
       console.error('Error loading user settings:', error);
+      setHasDefaultAmount(false);
+    } finally {
+      setIsLoadingUserData(false);
     }
   };
 
@@ -155,11 +170,14 @@ function App() {
 
   const handleUpdateDefaultAmount = async (amount: number) => {
     setBuyAmount(amount);
+    setHasDefaultAmount(true);
     
     // Update default amount in Supabase
     if (address) {
       try {
         await supabaseService.updateUserDefaultAmount(address, amount);
+        // Navigate to trending after setting amount
+        setCurrentPage('trending');
       } catch (error) {
         console.error('Error updating default amount:', error);
       }
@@ -185,11 +203,20 @@ function App() {
           />
         );
       
+      case 'defaultAmount':
+        return (
+          <DefaultAmountPage 
+            onSetAmount={handleUpdateDefaultAmount}
+            defaultValue={buyAmount}
+          />
+        );
+      
       case 'trending':
         return (
           <TrendingSwipePage 
             onNavigate={handleNavigation}
             onTokenPurchase={handleTokenPurchase}
+            buyAmount={buyAmount}
           />
         );
       

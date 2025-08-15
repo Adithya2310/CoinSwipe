@@ -1,14 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useAccount, useBalance } from 'wagmi';
+import { formatUnits } from 'viem';
 import { realTimeService, TrendingToken, PriceUpdate } from '../services/realTimeService';
 
 interface TrendingSwipePageProps {
   onNavigate: (page: string) => void;
   onTokenPurchase: (token: any, amount: number) => void;
+  buyAmount: number;
 }
 
-const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTokenPurchase }) => {
+const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTokenPurchase, buyAmount }) => {
+  // Wallet integration
+  const { address } = useAccount();
+  const { data: balance, isLoading: balanceLoading } = useBalance({ address });
+  
   // State management
   const [currentToken, setCurrentToken] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -17,8 +24,6 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showCopyToast, setShowCopyToast] = useState(false);
-  const [balance] = useState(129.00); // Static for now
-  const [buyAmount] = useState(1.00); // Static for now
   
   // Touch/Swipe state
   const [isDragging, setIsDragging] = useState(false);
@@ -181,7 +186,8 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
 
   const handleSwipeRight = () => {
     // Buy token
-    if (currentToken && balance >= buyAmount) {
+    const walletBalance = getWalletBalance();
+    if (currentToken && walletBalance >= buyAmount) {
       onTokenPurchase(currentToken, buyAmount);
       setToastMessage(`Successfully bought $${buyAmount.toFixed(2)} of ${currentToken.name}!`);
       setShowToast(true);
@@ -189,7 +195,27 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
       
       // Load next token
       loadNextToken();
+    } else {
+      setToastMessage(`Insufficient balance. You need at least $${buyAmount.toFixed(2)}`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     }
+  };
+
+  const getWalletBalance = () => {
+    if (balanceLoading || !balance) return 0;
+    // For simplicity, we'll treat 1 ETH = $3000 (you can integrate a price API later)
+    const balanceInEth = parseFloat(formatUnits(balance.value, balance.decimals));
+    return balanceInEth * 3000; // Rough ETH to USD conversion
+  };
+
+  const formatWalletBalance = () => {
+    if (balanceLoading) return 'Loading...';
+    if (!balance) return '$0.00';
+    
+    const balanceValue = parseFloat(formatUnits(balance.value, balance.decimals));
+    const usdValue = balanceValue * 3000; // Rough conversion
+    return `$${usdValue.toFixed(2)}`;
   };
 
   // Touch/Swipe handlers (same as before)
@@ -309,9 +335,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
     return (
       <div className="swipe-page">
         <div className="swipe-header">
-          <button className="back-btn" onClick={() => onNavigate('landing')}>
-            ←
-          </button>
+          <h1 className="swipe-title">Trending on Base</h1>
         </div>
         <div className="swipe-container">
           <div className="loading-spinner">
@@ -328,9 +352,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
     return (
       <div className="swipe-page">
         <div className="swipe-header">
-          <button className="back-btn" onClick={() => onNavigate('landing')}>
-            ←
-          </button>
+          <h1 className="swipe-title">Trending on Base</h1>
         </div>
         <div className="swipe-container">
           <div className="error-message">
@@ -349,9 +371,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
     return (
       <div className="swipe-page">
         <div className="swipe-header">
-          <button className="back-btn" onClick={() => onNavigate('landing')}>
-            ←
-          </button>
+          <h1 className="swipe-title">Trending on Base</h1>
         </div>
         <div className="swipe-container">
           <p>No more trending tokens available!</p>
@@ -393,13 +413,10 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
 
       {/* Header */}
       <div className="swipe-header">
-        <button className="back-btn" onClick={() => onNavigate('landing')}>
-          ← 
-        </button>
         <h1 className="swipe-title">Trending on Base</h1>
         <div className="swipe-stats">
           <div className="stat-item">Amount: ${buyAmount.toFixed(2)}</div>
-          <div className="stat-item">Balance: ${balance.toFixed(2)}</div>
+          <div className="stat-item">Balance: {formatWalletBalance()}</div>
           <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
             {connected ? '🟢 LIVE' : '🔴 OFFLINE'}
           </div>
@@ -428,51 +445,76 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            {/* Token Header */}
-            <div className="token-header">
-              <div className="token-icon-large" style={{ backgroundColor: currentToken.color }}>
+            {/* Token Header - Compact */}
+            <div className="token-header-compact">
+              <div className="token-icon-compact" style={{ backgroundColor: currentToken.color }}>
                 {currentToken.imageUrl ? (
-                  <img src={currentToken.imageUrl} alt={currentToken.symbol} className="token-image" />
+                  <img src={currentToken.imageUrl} alt={currentToken.symbol} className="token-image-compact" />
                 ) : (
-                  <span className="token-emoji">{currentToken.icon}</span>
+                  <span className="token-emoji-compact">{currentToken.icon}</span>
                 )}
               </div>
               
-              <div className="token-info">
-                <h2 className="token-name-large">{currentToken.name}</h2>
-                <p className="token-symbol-large">{currentToken.symbol}</p>
-              </div>
-              
-              <div className={`trust-badge-new ${currentToken.trustLevel}`}>
-                {currentToken.trustLevel === 'high' && '🟢 High Trust'}
-                {currentToken.trustLevel === 'medium' && '🟡 Medium Trust'}
-                {currentToken.trustLevel === 'low' && '🔴 Low Trust'}
-              </div>
-            </div>
-
-            {/* Price Section */}
-            <div className="price-section">
-              <div className="token-price-large live-price">{formatPrice(currentToken.price)}</div>
-              <div className="price-change-info">
-                <span className="change-label">24hr Change</span>
-                <div className={`price-change-large ${currentToken.priceChange24h >= 0 ? 'positive' : 'negative'}`}>
-                  {currentToken.priceChange24h >= 0 ? '↗' : '↘'} {Math.abs(currentToken.priceChange24h).toFixed(2)}%
+              <div className="token-info-compact">
+                <h2 className="token-name-compact">{currentToken.name}</h2>
+                <p className="token-symbol-compact">{currentToken.symbol}</p>
+                <div className={`trust-badge-compact ${currentToken.trustLevel}`}>
+                  <span className="trust-icon">
+                    {currentToken.trustLevel === 'high' && '🟢'}
+                    {currentToken.trustLevel === 'medium' && '🟡'}
+                    {currentToken.trustLevel === 'low' && '🔴'}
+                  </span>
+                  {currentToken.trustLevel === 'high' && 'High Trust'}
+                  {currentToken.trustLevel === 'medium' && 'Medium Trust'}
+                  {currentToken.trustLevel === 'low' && 'Low Trust'}
                 </div>
               </div>
             </div>
 
-            {/* Token Address */}
-            <div className="token-address-section">
-              <div className="address-label">Contract Address</div>
-              <div className="address-container">
-                <span className="address-text">
+            {/* Price Section - Compact */}
+            <div className="price-section-compact">
+              <div className="price-main">
+                <div className="token-price-compact">{formatPrice(currentToken.price)}</div>
+                <div className={`price-change-compact ${currentToken.priceChange24h >= 0 ? 'positive' : 'negative'}`}>
+                  <span className="change-arrow">{currentToken.priceChange24h >= 0 ? '↗' : '↘'}</span>
+                  <span className="change-percentage">{Math.abs(currentToken.priceChange24h).toFixed(2)}%</span>
+                </div>
+              </div>
+              <span className="price-label">24HR CHANGE</span>
+            </div>
+
+            {/* Stats Grid - Compact */}
+            <div className="stats-grid-compact">
+              <div className="stat-item-compact">
+                <div className="stat-label-compact">Liquidity</div>
+                <div className="stat-value-compact">{formatLargeNumber(currentToken.liquidity)}</div>
+              </div>
+              <div className="stat-item-compact">
+                <div className="stat-label-compact">Market Cap</div>
+                <div className="stat-value-compact">{formatLargeNumber(currentToken.marketCap)}</div>
+              </div>
+              <div className="stat-item-compact">
+                <div className="stat-label-compact">FDV</div>
+                <div className="stat-value-compact">{formatLargeNumber(currentToken.fdv || 0)}</div>
+              </div>
+              <div className="stat-item-compact">
+                <div className="stat-label-compact">Created</div>
+                <div className="stat-value-compact">28/6/56906</div>
+              </div>
+            </div>
+
+            {/* Token Address - Compact */}
+            <div className="contract-address-compact">
+              <span className="address-label-compact">CONTRACT ADDRESS</span>
+              <div className="address-container-compact">
+                <span className="address-text-compact">
                   {currentToken.pairAddress ? 
                     `${currentToken.pairAddress.slice(0, 6)}...${currentToken.pairAddress.slice(-4)}` : 
                     'Loading...'
                   }
                 </span>
                 <button 
-                  className="copy-button"
+                  className="copy-button-compact"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (currentToken.pairAddress) {
@@ -486,23 +528,21 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
                 </button>
               </div>
             </div>
-            
-            {/* Stats Grid */}
-            <div className="stats-grid">
-              <div className="stat-item">
-                <div className="stat-label-large">Liquidity</div>
-                <div className="stat-value-large">{formatLargeNumber(currentToken.liquidity)}</div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-label-large">Market Cap</div>
-                <div className="stat-value-large">{formatLargeNumber(currentToken.marketCap)}</div>
-              </div>
+
+            {/* Action Buttons - New */}
+            <div className="action-buttons-compact">
+              <button className="action-btn-compact website-btn">
+                🌐 Website
+              </button>
+              <button className="action-btn-compact dexscreener-btn">
+                📊 DexScreener
+              </button>
             </div>
             
-            {/* Live Indicator */}
-            <div className="live-indicator-new">
-              <span className="live-dot"></span>
-              <span className="live-text">REAL-TIME</span>
+            {/* Live Indicator - Compact */}
+            <div className="live-indicator-compact">
+              <span className="live-dot-compact"></span>
+              <span className="live-text-compact">REAL-TIME</span>
             </div>
           </div>
         </div>
