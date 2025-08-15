@@ -38,22 +38,22 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
       {isConnected && (
         <div className="nav-menu desktop-menu">
           <button
-            className={`nav-item ${currentPage === 'landing' ? 'active' : ''}`}
-            onClick={() => handleNavigate('landing')}
+            className={`nav-item ${currentPage === 'trending' ? 'active' : ''}`}
+            onClick={() => handleNavigate('trending')}
           >
-            🏠 Home
-          </button>
-          <button
-            className={`nav-item ${currentPage === 'categories' ? 'active' : ''}`}
-            onClick={() => handleNavigate('categories')}
-          >
-            📱 Categories
+            🔥 Trending
           </button>
           <button
             className={`nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}
             onClick={() => handleNavigate('portfolio')}
           >
             📊 Portfolio
+          </button>
+          <button
+            className={`nav-item ${currentPage === 'activity' ? 'active' : ''}`}
+            onClick={() => handleNavigate('activity')}
+          >
+            📈 Activity
           </button>
         </div>
       )}
@@ -95,22 +95,22 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
             </div>
             <div className="mobile-menu-items">
               <button
-                className={`mobile-nav-item ${currentPage === 'landing' ? 'active' : ''}`}
-                onClick={() => handleNavigate('landing')}
+                className={`mobile-nav-item ${currentPage === 'trending' ? 'active' : ''}`}
+                onClick={() => handleNavigate('trending')}
               >
-                🏠 Home
-              </button>
-              <button
-                className={`mobile-nav-item ${currentPage === 'categories' ? 'active' : ''}`}
-                onClick={() => handleNavigate('categories')}
-              >
-                📱 Categories
+                🔥 Trending
               </button>
               <button
                 className={`mobile-nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}
                 onClick={() => handleNavigate('portfolio')}
               >
                 📊 Portfolio
+              </button>
+              <button
+                className={`mobile-nav-item ${currentPage === 'activity' ? 'active' : ''}`}
+                onClick={() => handleNavigate('activity')}
+              >
+                📈 Activity
               </button>
               <button
                 className="mobile-nav-item logout"
