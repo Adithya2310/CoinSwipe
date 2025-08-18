@@ -15,7 +15,7 @@ const DefaultAmountModal: React.FC<DefaultAmountModalProps> = ({
   isOpen, 
   onClose, 
   onSetAmount, 
-  currentAmount = 1.0 
+  currentAmount = 0.001 
 }) => {
   const [buyAmount, setBuyAmount] = useState(currentAmount);
   const { address } = useAccount();
@@ -30,11 +30,10 @@ const DefaultAmountModal: React.FC<DefaultAmountModalProps> = ({
 
   const formatWalletBalance = () => {
     if (balanceLoading) return 'Loading...';
-    if (!balance) return '$0.00';
+    if (!balance) return '0.00 ETH';
     
     const balanceValue = parseFloat(formatUnits(balance.value, balance.decimals));
-    const usdValue = balanceValue * 3000; // Rough ETH to USD conversion
-    return `$${usdValue.toFixed(2)}`;
+    return `${balanceValue.toFixed(6)} ETH`;
   };
 
   if (!isOpen) return null;
@@ -54,30 +53,30 @@ const DefaultAmountModal: React.FC<DefaultAmountModalProps> = ({
           </div>
 
           <div className="amount-input-section">
-            <label className="input-label">Default Buy Amount (USD)</label>
+            <label className="input-label">Default Buy Amount (ETH)</label>
             <div className="input-wrapper">
-              <span className="currency-prefix">$</span>
+              <span className="currency-prefix">ETH</span>
               <input
                 type="number"
                 className="amount-input-modal"
                 value={buyAmount}
                 onChange={(e) => setBuyAmount(parseFloat(e.target.value) || 0)}
-                placeholder="1.00"
-                step="0.01"
-                min="0.01"
-                max="1000"
+                placeholder="0.001"
+                step="0.001"
+                min="0.0001"
+                max="10"
               />
             </div>
           </div>
 
           <div className="amount-presets">
-            {[0.5, 1.0, 5.0, 10.0].map((amount) => (
+            {[0.0001, 0.001, 0.01, 0.1].map((amount) => (
               <button
                 key={amount}
                 className={`preset-btn ${buyAmount === amount ? 'active' : ''}`}
                 onClick={() => setBuyAmount(amount)}
               >
-                ${amount.toFixed(amount < 1 ? 2 : 0)}
+                {amount} ETH
               </button>
             ))}
           </div>

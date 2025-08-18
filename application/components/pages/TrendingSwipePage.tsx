@@ -8,7 +8,7 @@ import DefaultAmountModal from '../ui/DefaultAmountModal';
 
 interface TrendingSwipePageProps {
   onNavigate: (page: string) => void;
-  onTokenPurchase: (token: any, amount: number) => void;
+  onTokenPurchase: (token: any, amount: number) => Promise<{ success: boolean; error?: string; transactionHash?: string; amountOut?: string; } | void>;
   buyAmount: number;
   onUpdateDefaultAmount: (amount: number) => void;
   hasDefaultAmount?: boolean;
@@ -236,38 +236,75 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
     loadNextToken();
   };
 
-  const handleSwipeRight = () => {
-    // Buy token
-    const walletBalance = getWalletBalance();
-    if (currentToken && walletBalance >= buyAmount) {
-      onTokenPurchase(currentToken, buyAmount);
-      setToastMessage(`Successfully bought $${buyAmount.toFixed(2)} of ${currentToken.name}!`);
+  const handleSwipeRight = async () => {
+    // Buy token with UniSwap
+    // Check if user has enough ETH for the hardcoded 0.0001 ETH swap
+    const requiredEthBalance = 0.0001; // Small amount for testnet with simulation fallback
+    
+    if (!currentToken) {
+      setToastMessage('No token selected');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
+    // Get actual ETH balance directly from wagmi
+    if (!balance) {
+      setToastMessage('Unable to fetch wallet balance');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
+    const actualEthBalance = parseFloat(formatUnits(balance.value, balance.decimals));
+    
+    if (actualEthBalance < requiredEthBalance) {
+      setToastMessage(`Insufficient ETH balance. You need at least ${requiredEthBalance} ETH for the swap.`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
+    try {
+      // Show loading state
+      setSwipeLoading(true);
+      setToastMessage('Executing swap on UniSwap...');
+      setShowToast(true);
+
+      // Execute the swap
+      const result = await onTokenPurchase(currentToken, buyAmount);
       
-      // Load next token
-      loadNextToken();
-    } else {
-      setToastMessage(`Insufficient balance. You need at least $${buyAmount.toFixed(2)}`);
+      if (result && result.success) {
+        setToastMessage(`🎉 Swap successful! Bought ${currentToken.symbol} with 0.0001 ETH`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 5000);
+        
+        // Load next token
+        loadNextToken();
+      } else {
+        const errorMsg = result?.error || 'Swap failed';
+        setToastMessage(`❌ Swap failed: ${errorMsg}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 5000);
+      }
+    } catch (error: any) {
+      console.error('Error in handleSwipeRight:', error);
+      setToastMessage(`❌ Error: ${error.message || 'Unknown error occurred'}`);
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+      setTimeout(() => setShowToast(false), 5000);
+    } finally {
+      setSwipeLoading(false);
     }
   };
 
-  const getWalletBalance = () => {
-    if (balanceLoading || !balance) return 0;
-    // For simplicity, we'll treat 1 ETH = $3000 (you can integrate a price API later)
-    const balanceInEth = parseFloat(formatUnits(balance.value, balance.decimals));
-    return balanceInEth * 3000; // Rough ETH to USD conversion
-  };
+
 
   const formatWalletBalance = () => {
     if (balanceLoading) return 'Loading...';
-    if (!balance) return '$0.00';
+    if (!balance) return '0.00 ETH';
     
     const balanceValue = parseFloat(formatUnits(balance.value, balance.decimals));
-    const usdValue = balanceValue * 3000; // Rough conversion
-    return `$${usdValue.toFixed(2)}`;
+    return `${balanceValue.toFixed(6)} ETH`;
   };
 
   // Touch/Swipe handlers (same as before)
@@ -472,7 +509,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
             onClick={() => setShowAmountModal(true)}
             title="Click to change default amount"
           >
-            Amount: ${buyAmount.toFixed(2)} ✏️
+            Amount: {buyAmount.toFixed(6)} ETH ✏️
           </button>
           <div className="stat-item">Balance: {formatWalletBalance()}</div>
           <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
