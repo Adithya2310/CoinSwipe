@@ -58,95 +58,196 @@ class RealTimeService {
   private maxSubscriptions = 5; // Server limit
 
   /**
-   * Initialize WebSocket Connection to Node.js Backend
+   * Initialize Connection - Mock Mode for Testing
    * 
-   * Connects to the dedicated Node.js server instead of Next.js API routes.
-   * This provides better WebSocket performance and reliability.
+   * Simulates connection to backend server for testing with hardcoded data.
+   * Skips actual WebSocket connection and uses mock price updates.
    */
   async initializeConnection(): Promise<void> {
     try {
-      console.log(`🔌 Connecting to backend server: ${BACKEND_SERVER_URL}`);
+      console.log('🔌 Initializing mock connection for testing...');
       
-      this.socket = io(BACKEND_SERVER_URL, {
-        transports: ['websocket', 'polling'],
-        timeout: 10000,
-        forceNew: true,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5
-      });
-
-      return new Promise((resolve, reject) => {
-        if (!this.socket) {
-          reject(new Error('Failed to create socket'));
-          return;
-        }
-
-        this.socket.on('connect', () => {
-          console.log('✅ Connected to real-time price service');
-          this.isConnected = true;
-          resolve();
-        });
-
-        this.socket.on('disconnect', () => {
-          console.log('❌ Disconnected from real-time service');
-          this.isConnected = false;
-        });
-
-        this.socket.on('connected', (data) => {
-          console.log('🚀 Real-time service ready:', data.message);
-        });
-
-        this.socket.on('priceUpdate', (update: PriceUpdate) => {
-          // Emit to all registered callbacks
-          this.priceCallbacks.forEach(callback => {
-            try {
-              callback(update);
-            } catch (error) {
-              console.error('Error in price update callback:', error);
-            }
-          });
-        });
-
-        this.socket.on('subscribed', (data) => {
-          console.log(`📈 Subscribed to ${data.pairAddress}`);
-        });
-
-        this.socket.on('error', (error) => {
-          console.error('❌ Socket error:', error);
-          reject(new Error(error));
-        });
-
-        // Connection timeout
-        setTimeout(() => {
-          if (!this.isConnected) {
-            reject(new Error('Connection timeout'));
-          }
-        }, 5000);
-      });
+      // Simulate connection delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      this.isConnected = true;
+      console.log('✅ Mock connection established - using hardcoded data');
+      
+      // Start mock price updates
+      this.startMockPriceUpdates();
+      
     } catch (error) {
-      console.error('Failed to initialize connection:', error);
+      console.error('Failed to initialize mock connection:', error);
       throw error;
     }
   }
 
   /**
-   * Fetch Trending Tokens from Node.js Backend
+   * Start Mock Price Updates
    * 
-   * Connects to the dedicated backend server to get trending tokens
-   * from the Base network with improved caching and performance.
+   * Simulates real-time price updates for testing purposes
+   */
+  private startMockPriceUpdates(): void {
+    setInterval(() => {
+      if (this.trendingTokens.length > 0) {
+        // Generate mock price update for a random token
+        const randomToken = this.trendingTokens[Math.floor(Math.random() * this.trendingTokens.length)];
+        const currentPrice = parseFloat(randomToken.priceUsd);
+        
+        // Generate small price variation (-2% to +2%)
+        const variation = (Math.random() - 0.5) * 0.04;
+        const newPrice = currentPrice * (1 + variation);
+        
+        const mockUpdate: PriceUpdate = {
+          pairAddress: randomToken.pairAddress,
+          priceUsd: newPrice.toString(),
+          priceChange24h: randomToken.priceChange.h24 + variation * 100,
+          timestamp: Date.now()
+        };
+
+        // Update the token's price in our mock data
+        randomToken.priceUsd = newPrice.toString();
+        randomToken.priceChange.h24 = mockUpdate.priceChange24h;
+
+        // Emit to callbacks
+        this.priceCallbacks.forEach(callback => {
+          try {
+            callback(mockUpdate);
+          } catch (error) {
+            console.error('Error in price update callback:', error);
+          }
+        });
+      }
+    }, 3000); // Update every 3 seconds
+  }
+
+  /**
+   * Fetch Trending Tokens - Using Hardcoded Data for Testing
+   * 
+   * Returns mock trending tokens for Base network to test functionality
+   * and Supabase integration without requiring backend server.
    */
   async fetchTrendingTokens(): Promise<TrendingToken[]> {
     try {
-      console.log('📊 Fetching trending tokens from backend server...');
+      console.log('📊 Loading hardcoded trending tokens for Base network...');
       
-      const response = await fetch(`${BACKEND_SERVER_URL}/api/trending`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // Hardcoded trending tokens for Base network testing
+      const mockTokens: TrendingToken[] = [
+        {
+          pairAddress: '0x4c9edd5852cd905f086c759e8383e09bff1e68b3',
+          baseToken: {
+            address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+            name: 'USD Coin',
+            symbol: 'USDC'
+          },
+          priceUsd: '1.0001',
+          priceChange: { h24: 0.02 },
+          liquidity: { usd: 15420000 },
+          marketCap: 32500000000,
+          fdv: 32500000000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/6319/large/USD_Coin_icon.png' }
+        },
+        {
+          pairAddress: '0x6446021f4e396da3df4235c62537b035c3c5d60a',
+          baseToken: {
+            address: '0x4200000000000000000000000000000000000006',
+            name: 'Wrapped Ethereum',
+            symbol: 'WETH'
+          },
+          priceUsd: '3247.82',
+          priceChange: { h24: 2.45 },
+          liquidity: { usd: 8920000 },
+          marketCap: 390000000000,
+          fdv: 390000000000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/2518/large/weth.png' }
+        },
+        {
+          pairAddress: '0x88a43bbdf9d098eec7bcdcbaf22ca6a7b5151890',
+          baseToken: {
+            address: '0x50c5725949a6f0c72e6c4a641f24049a917db0cb',
+            name: 'Dai Stablecoin',
+            symbol: 'DAI'
+          },
+          priceUsd: '0.9998',
+          priceChange: { h24: -0.01 },
+          liquidity: { usd: 2340000 },
+          marketCap: 5200000000,
+          fdv: 5200000000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/9956/large/Badge_Dai.png' }
+        },
+        {
+          pairAddress: '0xc5b208b3b5e3fa3a43ce8f8b6e0b2c5e7d4f3a2b',
+          baseToken: {
+            address: '0x940181a94a35a4569e4529a3cdfb74e38fd98631',
+            name: 'Aerodrome Finance',
+            symbol: 'AERO'
+          },
+          priceUsd: '1.23',
+          priceChange: { h24: 8.67 },
+          liquidity: { usd: 1850000 },
+          marketCap: 890000000,
+          fdv: 1200000000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/31745/large/token.png' }
+        },
+        {
+          pairAddress: '0xa1b2c3d4e5f6789012345678901234567890abcd',
+          baseToken: {
+            address: '0x2416092f143378750bb29b79ed961ab195cceea5',
+            name: 'EzETH',
+            symbol: 'ezETH'
+          },
+          priceUsd: '3298.45',
+          priceChange: { h24: 3.21 },
+          liquidity: { usd: 1200000 },
+          marketCap: 450000000,
+          fdv: 650000000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/34753/large/Ezeth_logo_circle.png' }
+        },
+        {
+          pairAddress: '0xf1e2d3c4b5a6978901234567890123456789cdef',
+          baseToken: {
+            address: '0x78a087d713be963bf307b18f2ff8122ef9a63ae9',
+            name: 'Base God',
+            symbol: 'TYBG'
+          },
+          priceUsd: '0.0000234',
+          priceChange: { h24: 15.43 },
+          liquidity: { usd: 890000 },
+          marketCap: 23400000,
+          fdv: 45600000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/31832/large/basegod.png' }
+        },
+        {
+          pairAddress: '0x9876543210fedcba0987654321fedcba09876543',
+          baseToken: {
+            address: '0xa88594d404727625a9437c3f886c7643872296ae',
+            name: 'WELL',
+            symbol: 'WELL'
+          },
+          priceUsd: '0.0456',
+          priceChange: { h24: -2.34 },
+          liquidity: { usd: 670000 },
+          marketCap: 12300000,
+          fdv: 18900000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/31661/large/well.png' }
+        },
+        {
+          pairAddress: '0x1a2b3c4d5e6f7890abcdef1234567890abcdef12',
+          baseToken: {
+            address: '0x27d2decb4bfc9c76f0309b8e88dec3a601fe25a8',
+            name: 'Bald',
+            symbol: 'BALD'
+          },
+          priceUsd: '0.0000891',
+          priceChange: { h24: 22.67 },
+          liquidity: { usd: 1450000 },
+          marketCap: 8900000,
+          fdv: 8900000,
+          info: { imageUrl: 'https://coin-images.coingecko.com/coins/images/31271/large/bald.png' }
+        }
+      ];
 
-      const data = await response.json();
-      this.trendingTokens = data.tokens || [];
+      this.trendingTokens = mockTokens;
       this.currentTokenIndex = 0;
 
       console.log(`✅ Loaded ${this.trendingTokens.length} trending tokens from backend`);
@@ -184,10 +285,10 @@ class RealTimeService {
     return this.trendingTokens[randomIndex];
   }
 
-  // Subscribe to price updates for a specific token
+  // Subscribe to price updates for a specific token (Mock Mode)
   subscribeToToken(pairAddress: string): void {
-    if (!this.socket || !this.isConnected) {
-      console.error('❌ Cannot subscribe: not connected to real-time service');
+    if (!this.isConnected) {
+      console.error('❌ Cannot subscribe: not connected to service');
       return;
     }
 
@@ -204,21 +305,19 @@ class RealTimeService {
       this.unsubscribeFromToken(oldestSubscription);
     }
 
-    console.log(`📊 Subscribing to price updates for ${pairAddress}`);
-    this.socket.emit('subscribe', pairAddress);
+    console.log(`📊 Mock subscribing to price updates for ${pairAddress}`);
     this.activeSubscriptions.add(pairAddress);
   }
 
-  // Unsubscribe from price updates
+  // Unsubscribe from price updates (Mock Mode)
   unsubscribeFromToken(pairAddress: string): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.isConnected) {
       return;
     }
 
     // Only unsubscribe if actually subscribed
     if (this.activeSubscriptions.has(pairAddress)) {
-      console.log(`📊 Unsubscribing from ${pairAddress}`);
-      this.socket.emit('unsubscribe', pairAddress);
+      console.log(`📊 Mock unsubscribing from ${pairAddress}`);
       this.activeSubscriptions.delete(pairAddress);
     }
   }
@@ -248,20 +347,15 @@ class RealTimeService {
     return this.fetchTrendingTokens();
   }
 
-  // Clean disconnect
+  // Clean disconnect (Mock Mode)
   disconnect(): void {
-    if (this.socket) {
-      // Unsubscribe from all active subscriptions
-      this.activeSubscriptions.forEach(pairAddress => {
-        this.socket?.emit('unsubscribe', pairAddress);
-      });
-      this.activeSubscriptions.clear();
-      
-      this.socket.disconnect();
-      this.socket = null;
-      this.isConnected = false;
-    }
+    console.log('🔌 Disconnecting mock service...');
+    
+    // Clear all subscriptions
+    this.activeSubscriptions.clear();
     this.priceCallbacks.clear();
+    this.isConnected = false;
+    this.socket = null;
   }
 
   // Get current subscriptions (for debugging)

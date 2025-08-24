@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWeb3AuthDisconnect, useWeb3AuthUser } from "@web3auth/modal/react";
+import { useAccount } from 'wagmi';
 
 interface NavigationProps {
   currentPage: string;
@@ -12,11 +13,32 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConnected }) => {
   const { disconnect, loading: disconnectLoading } = useWeb3AuthDisconnect();
   const { userInfo } = useWeb3AuthUser();
+  const { address } = useAccount();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    if (isProfileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileOpen]);
 
   const handleLogout = () => {
     disconnect();
     setIsMenuOpen(false);
+    setIsProfileOpen(false);
   };
 
   const handleNavigate = (page: string) => {
@@ -28,102 +50,111 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onNavigate, isConn
     setIsMenuOpen(!isMenuOpen);
   };
 
+  const toggleProfile = () => {
+    setIsProfileOpen(!isProfileOpen);
+  };
+
+  const copyAddress = async () => {
+    if (address) {
+      try {
+        await navigator.clipboard.writeText(address);
+        // You could add a toast notification here
+        console.log('Address copied to clipboard');
+      } catch (err) {
+        console.error('Failed to copy address:', err);
+      }
+    }
+    setIsProfileOpen(false);
+  };
+
+  const formatAddress = (addr: string) => {
+    if (!addr) return '';
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
   return (
-    <nav className="nav-header">
-      <div className="nav-logo">
-        Coin Swipe
-      </div>
-      
-      {/* Desktop Menu */}
-      {isConnected && (
-        <div className="nav-menu desktop-menu">
-          <button
-            className={`nav-item ${currentPage === 'trending' ? 'active' : ''}`}
-            onClick={() => handleNavigate('trending')}
-          >
-            🔥 Trending
-          </button>
-          <button
-            className={`nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}
-            onClick={() => handleNavigate('portfolio')}
-          >
-            📊 Portfolio
-          </button>
-          <button
-            className={`nav-item ${currentPage === 'activity' ? 'active' : ''}`}
-            onClick={() => handleNavigate('activity')}
-          >
-            📈 Activity
-          </button>
+    <>
+      {/* Top Navigation (Desktop & Mobile) */}
+      <nav className="nav-header">
+        <div className="nav-logo">
+          CoinSwipe
         </div>
-      )}
-
-      {/* Desktop Auth */}
-      {isConnected && (
-        <div className="nav-auth desktop-auth">
-          <div className="auth-status">
-            ● Connected
+        
+        {/* Desktop Menu */}
+        {isConnected && (
+          <div className="nav-menu desktop-menu">
+            <button
+              className={`nav-item ${currentPage === 'trending' ? 'active' : ''}`}
+              onClick={() => handleNavigate('trending')}
+            >
+              🔥 Trending
+            </button>
+            <button
+              className={`nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}
+              onClick={() => handleNavigate('portfolio')}
+            >
+              📊 Portfolio
+            </button>
           </div>
-          <button
-            className="logout-btn"
-            onClick={handleLogout}
-            disabled={disconnectLoading}
-          >
-            {disconnectLoading ? '...' : '🚪 Logout'}
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Mobile Hamburger */}
-      {isConnected && (
-        <button className="hamburger-btn" onClick={toggleMenu}>
-          <span className={`hamburger-line ${isMenuOpen ? 'open' : ''}`}></span>
-          <span className={`hamburger-line ${isMenuOpen ? 'open' : ''}`}></span>
-          <span className={`hamburger-line ${isMenuOpen ? 'open' : ''}`}></span>
-        </button>
-      )}
-
-      {/* Mobile Menu Overlay */}
-      {isConnected && isMenuOpen && (
-        <div className="mobile-menu-overlay" onClick={() => setIsMenuOpen(false)}>
-          <div className="mobile-menu" onClick={(e) => e.stopPropagation()}>
-            <div className="mobile-menu-header">
-              <div className="auth-status">● Connected</div>
-              <button className="close-menu-btn" onClick={() => setIsMenuOpen(false)}>
-                ×
-              </button>
-            </div>
-            <div className="mobile-menu-items">
+        {/* Profile Dropdown (Desktop & Mobile) */}
+        {isConnected && (
+          <div className="nav-auth">
+            <div className="profile-container" ref={profileRef}>
               <button
-                className={`mobile-nav-item ${currentPage === 'trending' ? 'active' : ''}`}
-                onClick={() => handleNavigate('trending')}
-              >
-                🔥 Trending
-              </button>
-              <button
-                className={`mobile-nav-item ${currentPage === 'portfolio' ? 'active' : ''}`}
-                onClick={() => handleNavigate('portfolio')}
-              >
-                📊 Portfolio
-              </button>
-              <button
-                className={`mobile-nav-item ${currentPage === 'activity' ? 'active' : ''}`}
-                onClick={() => handleNavigate('activity')}
-              >
-                📈 Activity
-              </button>
-              <button
-                className="mobile-nav-item logout"
-                onClick={handleLogout}
+                className="profile-btn"
+                onClick={toggleProfile}
                 disabled={disconnectLoading}
               >
-                {disconnectLoading ? '⏳ Logging out...' : '🚪 Logout'}
+                <span className="profile-icon">👤</span>
+                <span className="profile-address desktop-only">{formatAddress(address || '')}</span>
+                <span className="profile-arrow">{isProfileOpen ? '▲' : '▼'}</span>
               </button>
+              
+              {isProfileOpen && (
+                <div className="profile-dropdown">
+                  <button className="profile-dropdown-item" onClick={copyAddress}>
+                    <span className="dropdown-icon">📋</span>
+                    Copy Address
+                  </button>
+                  <button 
+                    className="profile-dropdown-item logout" 
+                    onClick={handleLogout}
+                    disabled={disconnectLoading}
+                  >
+                    <span className="dropdown-icon">🚪</span>
+                    {disconnectLoading ? 'Logging out...' : 'Logout'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        )}
+      </nav>
+
+      {/* Bottom Navigation (Mobile) */}
+      {isConnected && (
+        <nav className="mobile-bottom-nav">
+          <div className="mobile-nav-items">
+            <button
+              className={`mobile-nav-btn ${currentPage === 'trending' ? 'active' : ''}`}
+              onClick={() => handleNavigate('trending')}
+            >
+              <span className="nav-icon">🔥</span>
+              Trending
+            </button>
+            <button
+              className={`mobile-nav-btn ${currentPage === 'portfolio' ? 'active' : ''}`}
+              onClick={() => handleNavigate('portfolio')}
+            >
+              <span className="nav-icon">📊</span>
+              Portfolio
+            </button>
+          </div>
+        </nav>
       )}
-    </nav>
+    </>
   );
 };
 

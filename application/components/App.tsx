@@ -9,11 +9,11 @@ import DepositModal from "./ui/DepositModal";
 import LandingPage from "./pages/LandingPage";
 import TrendingSwipePage from "./pages/TrendingSwipePage";
 import PortfolioPage from "./pages/PortfolioPage";
-import ActivityPage from "./pages/ActivityPage";
+
 
 // Import Supabase integration
-import { supabaseService } from "../lib/supabaseService";
-import { PortfolioItemUI } from "../lib/supabase";
+import { supabaseService, TokenObject } from "../lib/supabaseService";
+import { PortfolioItemUI, supabase } from "../lib/supabase";
 
 // Data types for backward compatibility
 interface Token {
@@ -24,10 +24,10 @@ interface Token {
   pairAddress?: string;
 }
 
-// Use Supabase types for portfolio
+// Use PortfolioItemUI for compatibility with existing components
 type PortfolioItem = PortfolioItemUI;
 
-const defaultBuyAmount = 1.00;
+const defaultBuyAmount = 0.01;
 
 function App() {
   const { isConnected } = useWeb3AuthConnect();
@@ -43,6 +43,30 @@ function App() {
   const [hasDefaultAmount, setHasDefaultAmount] = useState(false);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
+  // Convert TokenObject to PortfolioItemUI for compatibility
+  const convertToPortfolioItemUI = (tokens: TokenObject[]): PortfolioItemUI[] => {
+    return tokens.map((token, index) => ({
+      tokenId: token.address,
+      token: {
+        id: token.address,
+        name: token.name,
+        symbol: token.symbol,
+        price: token.price,
+        priceChange24h: 0, // Not available in new schema
+        trustLevel: 'medium' as const,
+        icon: token.logo || '🪙',
+        color: '#2563EB',
+        contractAddress: token.address,
+        pairAddress: undefined
+      },
+      amount: token.amount || 0,
+      value: token.value_usd || 0,
+      purchasePrice: token.price,
+      change: 0, // Calculate if needed
+      totalInvested: token.value_usd || 0
+    }));
+  };
+
   // Load user portfolio from Supabase
   const loadUserPortfolio = useCallback(async () => {
     if (!address) return;
@@ -50,9 +74,10 @@ function App() {
     setIsLoadingPortfolio(true);
     try {
       const portfolioData = await supabaseService.getUserPortfolio(address);
-      setPortfolio(portfolioData);
+      const convertedPortfolio = convertToPortfolioItemUI(portfolioData);
+      setPortfolio(convertedPortfolio);
       
-      const totalValue = portfolioData.reduce((sum, item) => sum + item.value, 0);
+      const totalValue = portfolioData.reduce((sum, item) => sum + (item.value_usd || 0), 0);
       setTotalPortfolioValue(totalValue);
     } catch (error) {
       console.error('Error loading portfolio:', error);
@@ -88,10 +113,13 @@ function App() {
 
   // Update current page based on connection status
   useEffect(() => {
-    if (isConnected && currentPage === 'landing') {
-      // Always go to trending when connected - modal will show if needed
-      setCurrentPage('trending');
-    } else if (!isConnected && currentPage !== 'landing') {
+    if (isConnected) {
+      // Always go to trending when connected - this is our main landing page
+      if (currentPage === 'landing') {
+        setCurrentPage('trending');
+      }
+    } else if (!isConnected) {
+      // Show landing page when not connected
       setCurrentPage('landing');
       setHasDefaultAmount(false);
     }
@@ -128,7 +156,7 @@ function App() {
         name: token.baseToken?.name || token.name,
         symbol: token.baseToken?.symbol || token.symbol,
         iconUrl: token.baseToken?.info?.imageUrl || token.info?.imageUrl,
-        color: '#6366f1', // Default color
+        color: '#2563EB', // Use new blue theme color
         currentPrice: token.priceUsd ? parseFloat(token.priceUsd) : (token.price || 0),
         priceChange24h: token.priceChange?.h24 || token.priceChange24h,
         liquidityUsd: token.liquidity?.usd,
@@ -190,6 +218,88 @@ function App() {
     setIsDepositModalOpen(false);
   };
 
+  const handleTokenSell = async (tokenId: string, percentage: number) => {
+    if (!address) {
+      console.error('No wallet address available');
+      return;
+    }
+
+    try {
+      // Find the token in portfolio
+      const tokenToSell = portfolio.find(item => item.tokenId === tokenId);
+      if (!tokenToSell) {
+        console.error('Token not found in portfolio');
+        return;
+      }
+
+      // Calculate sell amount
+      const sellAmount = (tokenToSell.amount * percentage) / 100;
+      const sellValue = sellAmount * tokenToSell.token.price;
+
+      // Get current portfolio from Supabase
+      const currentPortfolio = await supabaseService.getUserPortfolio(address);
+      
+      // Find and update the token in portfolio
+      const updatedPortfolio = currentPortfolio.map((token: TokenObject) => {
+        if (token.address === tokenToSell.token.contractAddress) {
+          const newAmount = (token.amount || 0) - sellAmount;
+          return {
+            ...token,
+            amount: Math.max(0, newAmount), // Ensure amount doesn't go negative
+            value_usd: Math.max(0, newAmount * token.price)
+          };
+        }
+        return token;
+      }).filter((token: TokenObject) => (token.amount || 0) > 0); // Remove tokens with 0 amount
+
+      // Update portfolio in Supabase
+      const { error: portfolioError } = await supabase
+        .from('portfolio')
+        .update({
+          tokens: updatedPortfolio,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_address', address);
+
+      if (portfolioError) {
+        console.error('Error updating portfolio:', portfolioError);
+        return;
+      }
+
+      // Log the sell activity
+      const activityToken = {
+        address: tokenToSell.token.contractAddress,
+        name: tokenToSell.token.name,
+        symbol: tokenToSell.token.symbol,
+        logo: tokenToSell.token.icon,
+        price: tokenToSell.token.price
+      };
+
+      const { error: activityError } = await supabase
+        .from('activities')
+        .insert([
+          {
+            user_address: address,
+            token: activityToken,
+            action: 'SELL',
+            amount: sellValue // Amount in ETH received
+          }
+        ]);
+
+      if (activityError) {
+        console.error('Error logging sell activity:', activityError);
+      }
+
+      // Reload portfolio to reflect the sale
+      await loadUserPortfolio();
+      
+      console.log(`Successfully sold ${percentage}% of ${tokenToSell.token.symbol} for $${sellValue.toFixed(2)}`);
+      
+    } catch (error) {
+      console.error('Error handling token sale:', error);
+    }
+  };
+
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'landing':
@@ -221,16 +331,12 @@ function App() {
             totalValue={getTotalPortfolioValue()}
             onDepositClick={handleDepositClick}
             onUpdateDefaultAmount={handleUpdateDefaultAmount}
+            onTokenSell={handleTokenSell}
             currentDefaultAmount={buyAmount}
           />
         );
       
-      case 'activity':
-        return (
-          <ActivityPage 
-            onNavigate={handleNavigation}
-          />
-        );
+
       
       default:
         return (

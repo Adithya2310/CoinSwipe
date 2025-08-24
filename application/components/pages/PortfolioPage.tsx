@@ -11,6 +11,7 @@ interface PortfolioPageProps {
   totalValue: number;
   onDepositClick: () => void;
   onUpdateDefaultAmount?: (amount: number) => void;
+  onTokenSell?: (tokenId: string, percentage: number) => void;
   currentDefaultAmount?: number;
 }
 
@@ -19,9 +20,11 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
   totalValue, 
   onDepositClick, 
   onUpdateDefaultAmount,
-  currentDefaultAmount = 1.0 
+  onTokenSell,
+  currentDefaultAmount = 0.01 
 }) => {
   const [showAmountModal, setShowAmountModal] = useState(false);
+  const [sellModalOpen, setSellModalOpen] = useState<string | null>(null);
   const formatPrice = (price: number) => {
     if (price < 0.000001) {
       return price.toExponential(2);
@@ -141,6 +144,46 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
                   </div>
                 </div>
               </div>
+              
+              {/* Sell Actions */}
+              {onTokenSell && (
+                <div style={{ 
+                  padding: '16px 0 0 0',
+                  borderTop: '1px solid var(--border-gray)',
+                  marginTop: '16px'
+                }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: '8px'
+                  }}>
+                    <button
+                      className="sell-btn sell-25"
+                      onClick={() => onTokenSell(item.tokenId, 25)}
+                    >
+                      Sell 25%
+                    </button>
+                    <button
+                      className="sell-btn sell-50"
+                      onClick={() => onTokenSell(item.tokenId, 50)}
+                    >
+                      Sell 50%
+                    </button>
+                    <button
+                      className="sell-btn sell-75"
+                      onClick={() => onTokenSell(item.tokenId, 75)}
+                    >
+                      Sell 75%
+                    </button>
+                    <button
+                      className="sell-btn sell-100"
+                      onClick={() => onTokenSell(item.tokenId, 100)}
+                    >
+                      Sell All
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
