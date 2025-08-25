@@ -18,62 +18,46 @@ export const supabaseAdmin = supabaseServiceKey
     })
   : null;
 
-// Database Types
+// Database Types (New Schema)
 export interface User {
-  id: string;
-  wallet_address: string;
-  default_amount: number | null;
+  address: string; // Primary key
+  email?: string;
+  default_amount: number;
   created_at: string;
-  updated_at: string;
 }
 
-export interface Token {
-  id: string;
-  contract_address: string;
-  pair_address?: string;
+export interface TokenObject {
+  address: string;
   name: string;
   symbol: string;
-  icon_url?: string;
-  color: string;
-  current_price?: number;
-  price_change_24h?: number;
-  liquidity_usd?: number;
-  market_cap?: number;
-  fdv?: number;
-  trust_level: 'high' | 'medium' | 'low';
-  chain: string;
-  created_at: string;
+  logo?: string;
+  price: number;
+  amount?: number; // Only used in portfolio
+  value_usd?: number; // Only used in portfolio
+}
+
+export interface Portfolio {
+  user_address: string; // Primary key, FK to users.address
+  tokens: TokenObject[];
   updated_at: string;
 }
 
-export interface PortfolioHolding {
-  id: string;
-  user_id: string;
-  token_id: string;
-  amount: number;
-  average_purchase_price: number;
-  total_invested: number;
-  created_at: string;
+export interface Watchlist {
+  user_address: string; // Primary key, FK to users.address
+  tokens: TokenObject[];
   updated_at: string;
-  // Relations
-  token?: Token;
 }
 
 export interface Activity {
-  id: string;
-  user_id: string;
-  token_id: string;
-  activity_type: 'buy' | 'sell';
-  amount: number;
-  price_per_token: number;
-  total_value: number;
-  transaction_hash?: string;
+  id: string; // UUID primary key
+  user_address: string; // FK to users.address
+  token: TokenObject; // JSONB token snapshot
+  action: 'BUY' | 'SELL';
+  amount: number; // Amount traded (ETH or token qty)
   created_at: string;
-  // Relations
-  token?: Token;
 }
 
-// Extended types for UI components
+// Extended types for UI components (backward compatibility)
 export interface PortfolioItemUI {
   tokenId: string;
   token: {

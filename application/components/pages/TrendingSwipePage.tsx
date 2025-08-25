@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { formatUnits } from 'viem';
 import { realTimeService, TrendingToken, PriceUpdate } from '../services/realTimeService';
-import DefaultAmountModal from '../ui/DefaultAmountModal';
+
 
 interface TrendingSwipePageProps {
   onNavigate: (page: string) => void;
@@ -29,14 +29,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showCopyToast, setShowCopyToast] = useState(false);
-  const [showAmountModal, setShowAmountModal] = useState(false);
-
-  // Auto-show modal if user doesn't have default amount set
-  useEffect(() => {
-    if (!hasDefaultAmount && !loading && connected) {
-      setShowAmountModal(true);
-    }
-  }, [hasDefaultAmount, loading, connected]);
+  // Removed default amount modal - users can set amount in portfolio page
   
   // Touch/Swipe state
   const [isDragging, setIsDragging] = useState(false);
@@ -57,11 +50,11 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
         setLoading(true);
         setError(null);
 
-        // Initialize connection
+        // Initialize connection (using mock data for testing)
         await realTimeService.initializeConnection();
         setConnected(true);
 
-        // Fetch trending tokens
+        // Fetch trending tokens (hardcoded Base network tokens)
         await realTimeService.fetchTrendingTokens();
 
         // Get first token
@@ -386,9 +379,6 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   if (loading) {
     return (
       <div className="swipe-page">
-        <div className="swipe-header">
-          <h1 className="swipe-title">Trending on Base</h1>
-        </div>
         <div className="swipe-container">
           <div className="loading-spinner">
             <div className="spinner"></div>
@@ -403,9 +393,6 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   if (error) {
     return (
       <div className="swipe-page">
-        <div className="swipe-header">
-          <h1 className="swipe-title">Trending on Base</h1>
-        </div>
         <div className="swipe-container">
           <div className="error-message">
             <p>❌ {error}</p>
@@ -422,9 +409,6 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
   if (!currentToken) {
     return (
       <div className="swipe-page">
-        <div className="swipe-header">
-          <h1 className="swipe-title">Trending on Base</h1>
-        </div>
         <div className="swipe-container">
           <p>No more trending tokens available!</p>
         </div>
@@ -463,23 +447,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
         </div>
       )}
 
-      {/* Header */}
-      <div className="swipe-header">
-        <h1 className="swipe-title">Trending on Base</h1>
-        <div className="swipe-stats">
-          <button 
-            className="stat-item clickable"
-            onClick={() => setShowAmountModal(true)}
-            title="Click to change default amount"
-          >
-            Amount: ${buyAmount.toFixed(2)} ✏️
-          </button>
-          <div className="stat-item">Balance: {formatWalletBalance()}</div>
-          <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
-            {connected ? '🟢 LIVE' : '🔴 OFFLINE'}
-          </div>
-        </div>
-      </div>
+
 
       {/* Swipe Container */}
       <div className="swipe-container">
@@ -617,13 +585,7 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
         </div>
       </div>
 
-      {/* Default Amount Modal */}
-      <DefaultAmountModal
-        isOpen={showAmountModal}
-        onClose={() => setShowAmountModal(false)}
-        onSetAmount={onUpdateDefaultAmount}
-        currentAmount={buyAmount}
-      />
+
     </div>
   );
 };

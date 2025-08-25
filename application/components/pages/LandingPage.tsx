@@ -12,7 +12,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, userBalance, onUpdateDefaultAmount }) => {
   const { connect, isConnected, loading: connectLoading, error: connectError } = useWeb3AuthConnect();
   const { userInfo } = useWeb3AuthUser();
-  const [buyAmount, setBuyAmount] = useState(1.0);
+  const [buyAmount, setBuyAmount] = useState(0.01);
 
   const handleLogin = () => {
     connect();

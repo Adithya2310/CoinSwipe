@@ -1,38 +1,41 @@
-import { supabase, supabaseAdmin, User, Token, PortfolioHolding, Activity, PortfolioItemUI } from './supabase';
+import { supabase } from './supabase';
 
 /**
- * Supabase Service for CoinSwipe Portfolio Management
+ * Token Object Schema (as defined in backendstructure.md)
+ */
+export interface TokenObject {
+  address: string;
+  name: string;
+  symbol: string;
+  logo?: string;
+  price: number;
+  amount?: number; // Only used in portfolio
+  value_usd?: number; // Only used in portfolio
+}
+
+/**
+ * Supabase Service for CoinSwipe Base Network
  * 
- * This service handles all database operations for:
- * - User management (wallet addresses, settings)
- * - Token information management
- * - Portfolio holdings tracking
- * - Transaction activity logging
- * 
- * Uses anon client for all operations (no RLS rules applied)
+ * This service handles all database operations according to the new schema:
+ * - users: address (PK), email, default_amount, created_at
+ * - portfolio: user_address (PK), tokens (jsonb), updated_at
+ * - watchlist: user_address (PK), tokens (jsonb), updated_at
+ * - activities: id (PK), user_address, token (jsonb), action, amount, created_at
  */
 export class SupabaseService {
-  private currentWalletAddress: string | null = null;
-
-  // Set the current wallet address for filtering
-  setWalletAddress(walletAddress: string) {
-    this.currentWalletAddress = walletAddress;
-  }
   
   /**
    * USER MANAGEMENT
    */
   
   // Create or get user by wallet address
-  async createOrGetUser(walletAddress: string, defaultAmount: number | null = null): Promise<User | null> {
+  async createOrGetUser(address: string, defaultAmount: number = 0.01): Promise<any> {
     try {
-      this.setWalletAddress(walletAddress);
-      
       // First, try to get existing user
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('*')
-        .eq('wallet_address', walletAddress)
+        .eq('address', address)
         .single();
 
       if (existingUser) {
@@ -45,7 +48,7 @@ export class SupabaseService {
           .from('users')
           .insert([
             {
-              wallet_address: walletAddress,
+              address: address,
               default_amount: defaultAmount
             }
           ])
@@ -69,18 +72,15 @@ export class SupabaseService {
   }
 
   // Check if user exists without creating
-  async getUserByWalletAddress(walletAddress: string): Promise<User | null> {
+  async getUserByWalletAddress(address: string): Promise<any> {
     try {
       const { data: user, error } = await supabase
         .from('users')
         .select('*')
-        .eq('wallet_address', walletAddress)
+        .eq('address', address)
         .single();
 
-      if (error && error.code === 'PGRST123') {
-        console.error('Data integrity error: Multiple users found with wallet address:', walletAddress);
-        return null;
-      } else if (error && error.code !== 'PGRST116') {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user:', error);
         return null;
       }
@@ -92,14 +92,14 @@ export class SupabaseService {
     }
   }
 
-  // Update user's default amount (creates user if doesn't exist)
-  async updateUserDefaultAmount(walletAddress: string, defaultAmount: number): Promise<boolean> {
+  // Update user's default amount
+  async updateUserDefaultAmount(address: string, defaultAmount: number): Promise<boolean> {
     try {
       // First try to update existing user
       const { error: updateError } = await supabase
         .from('users')
         .update({ default_amount: defaultAmount })
-        .eq('wallet_address', walletAddress);
+        .eq('address', address);
 
       if (updateError && updateError.code === 'PGRST116') {
         // User doesn't exist, create new one
@@ -107,7 +107,7 @@ export class SupabaseService {
           .from('users')
           .insert([
             {
-              wallet_address: walletAddress,
+              address: address,
               default_amount: defaultAmount
             }
           ]);
@@ -129,169 +129,33 @@ export class SupabaseService {
   }
 
   /**
-   * TOKEN MANAGEMENT
-   */
-
-  // Create or update token information
-  async upsertToken(tokenData: {
-    contractAddress: string;
-    pairAddress?: string;
-    name: string;
-    symbol: string;
-    iconUrl?: string;
-    color?: string;
-    currentPrice?: number;
-    priceChange24h?: number;
-    liquidityUsd?: number;
-    marketCap?: number;
-    fdv?: number;
-    trustLevel?: 'high' | 'medium' | 'low';
-  }): Promise<Token | null> {
-    try {
-      const { data, error } = await supabase
-        .from('tokens')
-        .upsert([
-          {
-            contract_address: tokenData.contractAddress,
-            pair_address: tokenData.pairAddress,
-            name: tokenData.name,
-            symbol: tokenData.symbol,
-            icon_url: tokenData.iconUrl,
-            color: tokenData.color || '#6366f1',
-            current_price: tokenData.currentPrice,
-            price_change_24h: tokenData.priceChange24h,
-            liquidity_usd: tokenData.liquidityUsd,
-            market_cap: tokenData.marketCap,
-            fdv: tokenData.fdv,
-            trust_level: tokenData.trustLevel || 'medium'
-          }
-        ], { 
-          onConflict: 'contract_address',
-          ignoreDuplicates: false 
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error upserting token:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in upsertToken:', error);
-      return null;
-    }
-  }
-
-  // Get token by contract address
-  async getTokenByContractAddress(contractAddress: string): Promise<Token | null> {
-    try {
-      const { data, error } = await supabase
-        .from('tokens')
-        .select('*')
-        .eq('contract_address', contractAddress)
-        .single();
-
-      if (error) {
-        console.error('Error fetching token:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getTokenByContractAddress:', error);
-      return null;
-    }
-  }
-
-  // Update token price information
-  async updateTokenPrice(contractAddress: string, price: number, priceChange24h?: number): Promise<boolean> {
-    try {
-      const updateData: any = { 
-        current_price: price,
-        updated_at: new Date().toISOString()
-      };
-      
-      if (priceChange24h !== undefined) {
-        updateData.price_change_24h = priceChange24h;
-      }
-
-      const { error } = await supabase
-        .from('tokens')
-        .update(updateData)
-        .eq('contract_address', contractAddress);
-
-      if (error) {
-        console.error('Error updating token price:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in updateTokenPrice:', error);
-      return false;
-    }
-  }
-
-  /**
    * PORTFOLIO MANAGEMENT
    */
 
   // Get user's portfolio
-  async getUserPortfolio(walletAddress: string): Promise<PortfolioItemUI[]> {
+  async getUserPortfolio(address: string): Promise<any[]> {
     try {
-      this.setWalletAddress(walletAddress);
+      // Ensure user exists
+      await this.createOrGetUser(address);
       
-      // First get the user
-      const user = await this.createOrGetUser(walletAddress);
-      if (!user) {
+      // Get portfolio
+      const { data: portfolio, error } = await supabase
+        .from('portfolio')
+        .select('tokens')
+        .eq('user_address', address)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // Portfolio doesn't exist, return empty array
         return [];
       }
-
-      // Get portfolio holdings
-      const { data: holdings, error } = await supabase
-        .from('portfolio_holdings')
-        .select(`
-          *,
-          token:tokens(*)
-        `)
-        .eq('user_id', user.id)
-        .gt('amount', 0); // Only get holdings with positive amounts
 
       if (error) {
         console.error('Error fetching portfolio:', error);
         return [];
       }
 
-      // Transform to UI format
-      return holdings.map((holding: PortfolioHolding & { token: Token }) => {
-        const currentValue = holding.amount * (holding.token.current_price || 0);
-        const changePercent = holding.total_invested > 0 
-          ? ((currentValue - holding.total_invested) / holding.total_invested) * 100 
-          : 0;
-
-        return {
-          tokenId: holding.token.id,
-          token: {
-            id: holding.token.id,
-            name: holding.token.name,
-            symbol: holding.token.symbol,
-            price: holding.token.current_price || 0,
-            priceChange24h: holding.token.price_change_24h || 0,
-            trustLevel: holding.token.trust_level,
-            icon: holding.token.icon_url || '🪙',
-            color: holding.token.color,
-            contractAddress: holding.token.contract_address,
-            pairAddress: holding.token.pair_address
-          },
-          amount: holding.amount,
-          value: currentValue,
-          purchasePrice: holding.average_purchase_price,
-          change: changePercent,
-          totalInvested: holding.total_invested
-        };
-      });
+      return portfolio?.tokens || [];
     } catch (error) {
       console.error('Error in getUserPortfolio:', error);
       return [];
@@ -300,7 +164,7 @@ export class SupabaseService {
 
   // Add a token purchase to portfolio
   async addTokenPurchase(
-    walletAddress: string,
+    address: string,
     tokenData: {
       contractAddress: string;
       pairAddress?: string;
@@ -316,83 +180,85 @@ export class SupabaseService {
       trustLevel?: 'high' | 'medium' | 'low';
     },
     amount: number,
-    pricePerToken: number,
-    transactionHash?: string
+    pricePerToken: number
   ): Promise<boolean> {
     try {
-      // Get or create user
-      const user = await this.createOrGetUser(walletAddress);
-      if (!user) {
-        throw new Error('Failed to create or get user');
-      }
+      // Ensure user exists
+      await this.createOrGetUser(address);
 
-      // Upsert token
-      const token = await this.upsertToken(tokenData);
-      if (!token) {
-        throw new Error('Failed to upsert token');
-      }
+      // Create token object for portfolio
+      const tokenObject: TokenObject = {
+        address: tokenData.contractAddress,
+        name: tokenData.name,
+        symbol: tokenData.symbol,
+        logo: tokenData.iconUrl,
+        price: pricePerToken,
+        amount: amount,
+        value_usd: amount * pricePerToken
+      };
 
-      const totalValue = amount * pricePerToken;
+      // Get current portfolio
+      const currentPortfolio = await this.getUserPortfolio(address);
+      
+      // Check if token already exists in portfolio
+      const existingTokenIndex = currentPortfolio.findIndex(
+        (token: TokenObject) => token.address === tokenData.contractAddress
+      );
 
-      // Check for existing holding
-      const { data: existingHolding, error: fetchError } = await supabase
-        .from('portfolio_holdings')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('token_id', token.id)
-        .single();
-
-      let holdingResult;
-
-      if (existingHolding) {
-        // Update existing holding
-        const newTotalAmount = existingHolding.amount + amount;
-        const newTotalInvested = existingHolding.total_invested + totalValue;
-        const newAveragePrice = newTotalInvested / newTotalAmount;
-
-        const { error: updateError } = await supabase
-          .from('portfolio_holdings')
-          .update({
-            amount: newTotalAmount,
-            average_purchase_price: newAveragePrice,
-            total_invested: newTotalInvested
-          })
-          .eq('id', existingHolding.id);
-
-        if (updateError) {
-          throw updateError;
-        }
+      let updatedPortfolio;
+      if (existingTokenIndex >= 0) {
+        // Update existing token
+        const existingToken = currentPortfolio[existingTokenIndex];
+        const newAmount = (existingToken.amount || 0) + amount;
+        const newValue = newAmount * pricePerToken;
+        
+        updatedPortfolio = [...currentPortfolio];
+        updatedPortfolio[existingTokenIndex] = {
+          ...existingToken,
+          amount: newAmount,
+          value_usd: newValue,
+          price: pricePerToken // Update to latest price
+        };
       } else {
-        // Create new holding
-        const { error: insertError } = await supabase
-          .from('portfolio_holdings')
-          .insert([
-            {
-              user_id: user.id,
-              token_id: token.id,
-              amount: amount,
-              average_purchase_price: pricePerToken,
-              total_invested: totalValue
-            }
-          ]);
+        // Add new token
+        updatedPortfolio = [...currentPortfolio, tokenObject];
+      }
 
-        if (insertError) {
-          throw insertError;
-        }
+      // Update portfolio
+      const { error: portfolioError } = await supabase
+        .from('portfolio')
+        .upsert([
+          {
+            user_address: address,
+            tokens: updatedPortfolio,
+            updated_at: new Date().toISOString()
+          }
+        ], { 
+          onConflict: 'user_address' 
+        });
+
+      if (portfolioError) {
+        console.error('Error updating portfolio:', portfolioError);
+        return false;
       }
 
       // Log the activity
+      const activityToken = {
+        address: tokenData.contractAddress,
+        name: tokenData.name,
+        symbol: tokenData.symbol,
+        logo: tokenData.iconUrl,
+        price: pricePerToken
+      };
+
       const { error: activityError } = await supabase
         .from('activities')
         .insert([
           {
-            user_id: user.id,
-            token_id: token.id,
-            activity_type: 'buy',
-            amount: amount,
-            price_per_token: pricePerToken,
-            total_value: totalValue,
-            transaction_hash: transactionHash
+            user_address: address,
+            token: activityToken,
+            action: 'BUY',
+            amount: amount * pricePerToken // Amount in ETH spent
           }
         ]);
 
@@ -409,27 +275,144 @@ export class SupabaseService {
   }
 
   /**
+   * WATCHLIST MANAGEMENT
+   */
+
+  // Get user's watchlist
+  async getUserWatchlist(address: string): Promise<TokenObject[]> {
+    try {
+      // Ensure user exists
+      await this.createOrGetUser(address);
+      
+      // Get watchlist
+      const { data: watchlist, error } = await supabase
+        .from('watchlist')
+        .select('tokens')
+        .eq('user_address', address)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // Watchlist doesn't exist, return empty array
+        return [];
+      }
+
+      if (error) {
+        console.error('Error fetching watchlist:', error);
+        return [];
+      }
+
+      return watchlist?.tokens || [];
+    } catch (error) {
+      console.error('Error in getUserWatchlist:', error);
+      return [];
+    }
+  }
+
+  // Add token to watchlist
+  async addToWatchlist(address: string, tokenData: {
+    contractAddress: string;
+    name: string;
+    symbol: string;
+    iconUrl?: string;
+    currentPrice: number;
+  }): Promise<boolean> {
+    try {
+      // Ensure user exists
+      await this.createOrGetUser(address);
+
+      // Create token object for watchlist
+      const tokenObject: TokenObject = {
+        address: tokenData.contractAddress,
+        name: tokenData.name,
+        symbol: tokenData.symbol,
+        logo: tokenData.iconUrl,
+        price: tokenData.currentPrice
+      };
+
+      // Get current watchlist
+      const currentWatchlist = await this.getUserWatchlist(address);
+      
+      // Check if token already exists
+      const exists = currentWatchlist.some(
+        (token: TokenObject) => token.address === tokenData.contractAddress
+      );
+
+      if (exists) {
+        return true; // Already in watchlist
+      }
+
+      // Add new token
+      const updatedWatchlist = [...currentWatchlist, tokenObject];
+
+      // Update watchlist
+      const { error } = await supabase
+        .from('watchlist')
+        .upsert([
+          {
+            user_address: address,
+            tokens: updatedWatchlist,
+            updated_at: new Date().toISOString()
+          }
+        ], { 
+          onConflict: 'user_address' 
+        });
+
+      if (error) {
+        console.error('Error updating watchlist:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in addToWatchlist:', error);
+      return false;
+    }
+  }
+
+  // Remove token from watchlist
+  async removeFromWatchlist(address: string, contractAddress: string): Promise<boolean> {
+    try {
+      // Get current watchlist
+      const currentWatchlist = await this.getUserWatchlist(address);
+      
+      // Remove token
+      const updatedWatchlist = currentWatchlist.filter(
+        (token: TokenObject) => token.address !== contractAddress
+      );
+
+      // Update watchlist
+      const { error } = await supabase
+        .from('watchlist')
+        .update({
+          tokens: updatedWatchlist,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_address', address);
+
+      if (error) {
+        console.error('Error updating watchlist:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in removeFromWatchlist:', error);
+      return false;
+    }
+  }
+
+  /**
    * ACTIVITY MANAGEMENT
    */
 
   // Get user's activity history
-  async getUserActivities(walletAddress: string, limit: number = 50): Promise<Activity[]> {
+  async getUserActivities(address: string, limit: number = 50): Promise<any[]> {
     try {
-      this.setWalletAddress(walletAddress);
-      
-      const user = await this.createOrGetUser(walletAddress);
-      if (!user) {
-        return [];
-      }
-
       // Get user activities
       const { data: activities, error } = await supabase
         .from('activities')
-        .select(`
-          *,
-          token:tokens(*)
-        `)
-        .eq('user_id', user.id)
+        .select('*')
+        .eq('user_address', address)
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -450,48 +433,15 @@ export class SupabaseService {
    */
 
   // Calculate total portfolio value
-  async getTotalPortfolioValue(walletAddress: string): Promise<number> {
+  async getTotalPortfolioValue(address: string): Promise<number> {
     try {
-      const portfolio = await this.getUserPortfolio(walletAddress);
-      return portfolio.reduce((total, item) => total + item.value, 0);
+      const portfolio = await this.getUserPortfolio(address);
+      return portfolio.reduce((total: number, token: TokenObject) => {
+        return total + (token.value_usd || 0);
+      }, 0);
     } catch (error) {
       console.error('Error calculating portfolio value:', error);
       return 0;
-    }
-  }
-
-  // Get portfolio stats
-  async getPortfolioStats(walletAddress: string): Promise<{
-    totalValue: number;
-    totalInvested: number;
-    totalReturn: number;
-    totalReturnPercent: number;
-    tokenCount: number;
-  }> {
-    try {
-      const portfolio = await this.getUserPortfolio(walletAddress);
-      
-      const totalValue = portfolio.reduce((sum, item) => sum + item.value, 0);
-      const totalInvested = portfolio.reduce((sum, item) => sum + item.totalInvested, 0);
-      const totalReturn = totalValue - totalInvested;
-      const totalReturnPercent = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
-
-      return {
-        totalValue,
-        totalInvested,
-        totalReturn,
-        totalReturnPercent,
-        tokenCount: portfolio.length
-      };
-    } catch (error) {
-      console.error('Error calculating portfolio stats:', error);
-      return {
-        totalValue: 0,
-        totalInvested: 0,
-        totalReturn: 0,
-        totalReturnPercent: 0,
-        tokenCount: 0
-      };
     }
   }
 }
