@@ -69,8 +69,8 @@ A clean **service layer** in the frontend ensures we can migrate to a backend la
    - Authenticate using MetaMask Embedded Wallet.
    - If new user → insert into `users` with `default_amount = 0.01`.
 
-2. **Trending Tokens**(For MVP)
-   - Fetch only tokens available on Base using the Dexscreener Api.
+2. **Trending Tokens** (For MVP)
+   - Fetch only tokens available on Base using the Dexscreener API.
    - Logic isolated in `/services/tokens.js`.
 
 <!-- 2. **Trending Tokens**(Future Scope)
