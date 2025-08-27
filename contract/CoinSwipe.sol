@@ -3,15 +3,50 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+
+// 1inch AggregationRouterV6 interface for Base network
+interface IAggregationRouterV6 {
+    struct SwapDescription {
+        IERC20 srcToken;
+        IERC20 dstToken;
+        address srcReceiver;
+        address dstReceiver;
+        uint256 amount;
+        uint256 minReturnAmount;
+        uint256 flags;
+    }
+
+    function swap(
+        address executor,
+        SwapDescription calldata desc,
+        bytes calldata permit,
+        bytes calldata data
+    ) external payable returns (uint256 returnAmount, uint256 spentAmount);
+
+    function unoswap(
+        IERC20 srcToken,
+        uint256 amount,
+        uint256 minReturn,
+        uint256 dex
+    ) external payable returns (uint256 returnAmount);
+
+    function unoswapTo(
+        IERC20 srcToken,
+        uint256 amount,
+        uint256 minReturn,
+        uint256 dex,
+        address to
+    ) external payable returns (uint256 returnAmount);
+}
 
 contract CoinSwipe is Ownable {
     uint256 public feePercentage; // Fee percentage in basis points (e.g., 100 = 1%)
     address public feeCollectionAddress; // Address where fees are sent
-    IUniswapV2Router02 public uniswapRouter;
+    IAggregationRouterV6 public oneInchRouter;
     
+    // Base network addresses
     address private constant WETH = 0x4200000000000000000000000000000000000006;
-    // IERC20 private weth = IERC20(WETH);
+    address private constant ONE_INCH_ROUTER_V6 = 0x111111125421cA6dc452d289314280a0f8842A65;
 
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
     event FeeCollectionAddressUpdated(address oldAddress, address newAddress);
@@ -20,21 +55,18 @@ contract CoinSwipe is Ownable {
 
     constructor(
         uint256 _initialFeePercentage,
-        address _feeCollectionAddress,
-        address _uniswapRouter
+        address _feeCollectionAddress
     ) Ownable(msg.sender) {
         require(_initialFeePercentage <= 10000, "Fee percentage too high");
         require(_feeCollectionAddress != address(0), "Invalid fee address");
 
         feePercentage = _initialFeePercentage;
         feeCollectionAddress = _feeCollectionAddress;
-        // feeCollectionAddress = msg.sender;
-        uniswapRouter = IUniswapV2Router02(_uniswapRouter);
+        oneInchRouter = IAggregationRouterV6(ONE_INCH_ROUTER_V6);
     }
 
     // Update the fee percentage
     function setFeePercentage(uint256 _newFeePercentage) external onlyOwner {
-    // function setFeePercentage(uint256 _newFeePercentage) external {
         require(_newFeePercentage <= 10000, "Fee percentage too high");
         emit FeePercentageUpdated(feePercentage, _newFeePercentage);
         feePercentage = _newFeePercentage;
@@ -47,102 +79,76 @@ contract CoinSwipe is Ownable {
         feeCollectionAddress = _newFeeCollectionAddress;
     }
 
-    // Swap ETH to token and collect fees
-    // function swapETHToToken(address _token, uint256 amountIn, uint256 _minTokens) external {
-    //     require(amountIn > 0, "ETH required for swap");
+    // Swap ETH to token using 1inch unoswap
+    function swapEthToToken(address _token, uint256 _minTokens, uint256 _dex) external payable {
+        require(msg.value > 0, "ETH required for swap");
+        require(_token != WETH, "Cannot swap ETH to WETH directly");
 
-    //     uint256 fee = (amountIn * feePercentage) / 10000;
-    //     uint256 amountToSwap = amountIn - fee;
+        uint256 fee = (msg.value * feePercentage) / 10000;
+        uint256 amountToSwap = msg.value - fee;
 
-    //     IERC20 weth = IERC20(_token);
-    //     weth.transferFrom(msg.sender, address(this), amountToSwap);
-    //     // weth.approve(address(uniswapRouter), amountToSwap);
+        // Send fee to the fee collection address (in ETH)
+        if (fee > 0) {
+            payable(feeCollectionAddress).transfer(fee);
+        }
 
-    //     // Send fee to the fee collection address
-    //     // payable(feeCollectionAddress).transfer(fee);
+        // Perform the swap using 1inch unoswapTo with ETH
+        oneInchRouter.unoswapTo{value: amountToSwap}(
+            IERC20(address(0)), // address(0) represents ETH in 1inch
+            amountToSwap,
+            _minTokens,
+            _dex,
+            msg.sender
+        );
 
-    //     // // Perform the swap
-    //     // address[] memory path = new address[](2);
-    //     // path[0] = uniswapRouter.WETH();
-    //     // path[1] = _token;
-
-    //     // uniswapRouter.swapExactTokensForTokens(
-    //     //     amountToSwap,
-    //     //     _minTokens,
-    //     //     path,
-    //     //     msg.sender,
-    //     //     block.timestamp
-    //     // );
-
-    //     emit SwapETHToToken(msg.sender, amountIn, _token);
-    // }
-
-    function swapETHToToken(address _token, uint256 _ethAmount, uint256 _minTokens) external {
-        require(_ethAmount > 0, "ETH required for swap");
-
-        uint256 fee = (_ethAmount * feePercentage) / 10000;
-        uint256 amountToSwap = _ethAmount - fee;
-
-        // require(IERC20(WETH).balanceOf(msg.sender) >= amountToSwap, "Insufficient WETH balance");
-
-        // Send fee to the fee collection address
-        // payable(feeCollectionAddress).transfer(fee);
-
-        IERC20 weth = IERC20(WETH);
-        weth.transferFrom(msg.sender, address(this), _ethAmount);
-        weth.approve(address(uniswapRouter), amountToSwap);
-
-        // Perform the swap
-        address[] memory path = new address[](2);
-        path[0] = WETH;
-        path[1] = _token;
-
-        // uniswapRouter.swapExactETHForTokens{value: amountToSwap}(
-        //     _minTokens,
-        //     path,
-        //     msg.sender,
-        //     block.timestamp
-        // );
-        uniswapRouter.swapExactTokensForTokens(amountToSwap, _minTokens, path, msg.sender, block.timestamp);
-
-        emit SwapETHToToken(msg.sender, _ethAmount, _token);
+        emit SwapETHToToken(msg.sender, msg.value, _token);
     }
 
-    // Swap token to ETH and collect fees
-    function swapTokenToETH(
+    // Swap token to ETH using 1inch unoswap
+    function swapTokenToEth(
         address _token,
         uint256 _tokenAmount,
-        uint256 _minETH
+        uint256 _minETH,
+        uint256 _dex
     ) external {
         require(_tokenAmount > 0, "Token amount required");
+        require(_token != WETH, "Cannot swap WETH to WETH");
 
-        // uint256 fee = (_tokenAmount * feePercentage) / 10000;
-        // uint256 amountToSwap = _tokenAmount - fee;
+        uint256 fee = (_tokenAmount * feePercentage) / 10000;
+        uint256 amountToSwap = _tokenAmount - fee;
 
         // Transfer tokens to the contract
         IERC20(_token).transferFrom(msg.sender, address(this), _tokenAmount);
 
-        // Approve Uniswap to spend tokens
-        // IERC20(_token).approve(address(uniswapRouter), amountToSwap);
-        IERC20(_token).approve(address(uniswapRouter), _tokenAmount);
+        // Send fee to the fee collection address (in tokens)
+        if (fee > 0) {
+            IERC20(_token).transfer(feeCollectionAddress, fee);
+        }
 
-        // Perform the swap
-        address[] memory path = new address[](2);
-        path[0] = _token;
-        path[1] = WETH;
+        // Approve 1inch router to spend tokens
+        IERC20(_token).approve(address(oneInchRouter), amountToSwap);
 
-        uniswapRouter.swapExactTokensForETH(
-            // amountToSwap,
-            _tokenAmount,
+        // Perform the swap using 1inch unoswapTo to ETH
+        oneInchRouter.unoswapTo(
+            IERC20(_token),
+            amountToSwap,
             _minETH,
-            path,
-            msg.sender,
-            block.timestamp
+            _dex,
+            msg.sender
         );
-
-        // Send fee in ETH to the fee collection address
-        // IERC20(_token).transfer(feeCollectionAddress, fee);
 
         emit SwapTokenToETH(msg.sender, _tokenAmount, _token);
     }
+
+    // Emergency function to recover stuck tokens
+    function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
+        if (_token == address(0)) {
+            payable(owner()).transfer(_amount);
+        } else {
+            IERC20(_token).transfer(owner(), _amount);
+        }
+    }
+
+    // Allow contract to receive ETH
+    receive() external payable {}
 }
