@@ -229,17 +229,39 @@ const TrendingSwipePage: React.FC<TrendingSwipePageProps> = ({ onNavigate, onTok
     loadNextToken();
   };
 
-  const handleSwipeRight = () => {
+  const handleSwipeRight = async () => {
     // Buy token
     const walletBalance = getWalletBalance();
     if (currentToken && walletBalance >= buyAmount) {
-      onTokenPurchase(currentToken, buyAmount);
-      setToastMessage(`Successfully bought $${buyAmount.toFixed(2)} of ${currentToken.name}!`);
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-      
-      // Load next token
-      loadNextToken();
+      try {
+        setSwipeLoading(true);
+        setToastMessage('Processing transaction...');
+        setShowToast(true);
+        
+        await onTokenPurchase(currentToken, buyAmount);
+        
+        setToastMessage(`Successfully bought $${buyAmount.toFixed(2)} of ${currentToken.name}!`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        
+        // Load next token
+        loadNextToken();
+      } catch (error: any) {
+        console.error('Token purchase failed:', error);
+        
+        let errorMessage = 'Transaction failed. Please try again.';
+        if (error.message?.includes('User rejected')) {
+          errorMessage = 'Transaction cancelled by user.';
+        } else if (error.message?.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds for transaction.';
+        }
+        
+        setToastMessage(errorMessage);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } finally {
+        setSwipeLoading(false);
+      }
     } else {
       setToastMessage(`Insufficient balance. You need at least $${buyAmount.toFixed(2)}`);
       setShowToast(true);

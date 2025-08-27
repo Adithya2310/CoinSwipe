@@ -11,7 +11,7 @@ interface PortfolioPageProps {
   totalValue: number;
   onDepositClick: () => void;
   onUpdateDefaultAmount?: (amount: number) => void;
-  onTokenSell?: (tokenId: string, percentage: number) => void;
+  onTokenSell?: (tokenId: string, percentage: number) => Promise<any>;
   currentDefaultAmount?: number;
 }
 
@@ -25,6 +25,46 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
 }) => {
   const [showAmountModal, setShowAmountModal] = useState(false);
   const [sellModalOpen, setSellModalOpen] = useState<string | null>(null);
+  const [sellLoading, setSellLoading] = useState<string | null>(null);
+  const [sellError, setSellError] = useState<string | null>(null);
+  const [sellSuccess, setSellSuccess] = useState<string | null>(null);
+
+  // Handle sell operation with loading states and error handling
+  const handleSell = async (tokenId: string, percentage: number) => {
+    if (!onTokenSell) return;
+
+    const sellKey = `${tokenId}-${percentage}`;
+    setSellLoading(sellKey);
+    setSellError(null);
+    setSellSuccess(null);
+
+    try {
+      await onTokenSell(tokenId, percentage);
+      setSellSuccess(`Successfully sold ${percentage}% of your tokens!`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSellSuccess(null), 3000);
+    } catch (error: any) {
+      console.error('Sell operation failed:', error);
+      
+      let errorMessage = 'Failed to sell tokens. Please try again.';
+      if (error.message?.includes('User rejected')) {
+        errorMessage = 'Transaction cancelled by user.';
+      } else if (error.message?.includes('insufficient balance')) {
+        errorMessage = 'Insufficient token balance.';
+      } else if (error.message?.includes('insufficient allowance')) {
+        errorMessage = 'Token approval failed.';
+      }
+      
+      setSellError(errorMessage);
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => setSellError(null), 5000);
+    } finally {
+      setSellLoading(null);
+    }
+  };
+
   const formatPrice = (price: number) => {
     if (price < 0.000001) {
       return price.toExponential(2);
@@ -44,6 +84,39 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
 
   return (
     <div className="portfolio-page">
+      {/* Toast Notifications */}
+      {sellSuccess && (
+        <div className="toast success" style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#10b981',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          ✅ {sellSuccess}
+        </div>
+      )}
+      
+      {sellError && (
+        <div className="toast error" style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#ef4444',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          ❌ {sellError}
+        </div>
+      )}
+
       {/* Portfolio Header */}
       <div className="portfolio-header">
         <h1 className="portfolio-title">Your Portfolio</h1>
@@ -159,27 +232,31 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
                   }}>
                     <button
                       className="sell-btn sell-25"
-                      onClick={() => onTokenSell(item.tokenId, 25)}
+                      onClick={() => handleSell(item.tokenId, 25)}
+                      disabled={sellLoading === `${item.tokenId}-25`}
                     >
-                      Sell 25%
+                      {sellLoading === `${item.tokenId}-25` ? '...' : 'Sell 25%'}
                     </button>
                     <button
                       className="sell-btn sell-50"
-                      onClick={() => onTokenSell(item.tokenId, 50)}
+                      onClick={() => handleSell(item.tokenId, 50)}
+                      disabled={sellLoading === `${item.tokenId}-50`}
                     >
-                      Sell 50%
+                      {sellLoading === `${item.tokenId}-50` ? '...' : 'Sell 50%'}
                     </button>
                     <button
                       className="sell-btn sell-75"
-                      onClick={() => onTokenSell(item.tokenId, 75)}
+                      onClick={() => handleSell(item.tokenId, 75)}
+                      disabled={sellLoading === `${item.tokenId}-75`}
                     >
-                      Sell 75%
+                      {sellLoading === `${item.tokenId}-75` ? '...' : 'Sell 75%'}
                     </button>
                     <button
                       className="sell-btn sell-100"
-                      onClick={() => onTokenSell(item.tokenId, 100)}
+                      onClick={() => handleSell(item.tokenId, 100)}
+                      disabled={sellLoading === `${item.tokenId}-100`}
                     >
-                      Sell All
+                      {sellLoading === `${item.tokenId}-100` ? '...' : 'Sell All'}
                     </button>
                   </div>
                 </div>
