@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     CoinSwipe: {
-      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      address: "0x2a9757807153d55b3399C79d44c9318aFE0C5Bc8",
       abi: [
         {
           inputs: [
@@ -331,7 +331,7 @@ const deployedContracts = {
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
-      deployedOnBlock: 1,
+      deployedOnBlock: 35024006,
     },
   },
   84532: {

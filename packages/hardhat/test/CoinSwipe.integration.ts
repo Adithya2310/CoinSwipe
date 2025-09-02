@@ -27,7 +27,8 @@ describe("CoinSwipe Integration Tests", function () {
       return;
     }
 
-    [owner, feeCollector, user] = await ethers.getSigners();
+    [owner, feeCollector] = await ethers.getSigners();
+    const user = (await ethers.getSigners())[2]; // Get the third signer
 
     const coinSwipeFactory = await ethers.getContractFactory("CoinSwipe");
     coinSwipe = (await coinSwipeFactory.deploy(INITIAL_FEE_PERCENTAGE, feeCollector.address)) as CoinSwipe;

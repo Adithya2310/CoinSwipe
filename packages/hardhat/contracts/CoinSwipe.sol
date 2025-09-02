@@ -143,10 +143,14 @@ contract CoinSwipe is Ownable {
     // Emergency function to recover stuck tokens
     function emergencyWithdraw(address _token, uint256 _amount) external onlyOwner {
         if (_token == address(0)) {
+            // Withdraw ETH
             require(address(this).balance >= _amount, "Insufficient contract balance");
             payable(msg.sender).transfer(_amount);
         } else {
-            IERC20(_token).transfer(msg.sender, _amount);
+            // Withdraw ERC20 tokens
+            IERC20 token = IERC20(_token);
+            require(token.balanceOf(address(this)) >= _amount, "Insufficient token balance");
+            token.transfer(msg.sender, _amount);
         }
     }
 
